@@ -20,8 +20,6 @@ U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE);
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
-#define OLED_RESET -1
-#define SCREEN_ADDRESS 0x3C
 #define I2C_SDA 21
 #define I2C_SCL 22
 
@@ -74,7 +72,6 @@ void updateOLED() {
     u8g2.clearBuffer();
     u8g2.setFont(u8g2_font_6x12_tf);
 
-    // Header
     String nodeStr = String(mesh.getNodeId()).substring(0, 4);
     String countStr = String(mesh.getNodeList().size());
 
@@ -84,10 +81,8 @@ void updateOLED() {
     u8g2.print(" | ");
     u8g2.print(countStr);
 
-    // Divider line
     u8g2.drawLine(0, 12, SCREEN_WIDTH, 12);
 
-    // Messages
     int y = 24;
 
     for (int i = 0; i < 4 && i < chatCount; i++) {
@@ -103,7 +98,6 @@ void updateOLED() {
 
     u8g2.sendBuffer();
 }
-
 
 /* ================= MESH ================= */
 
@@ -127,12 +121,26 @@ void setup() {
 
     Serial.begin(115200);
 
-    // OLED
     Wire.begin(I2C_SDA, I2C_SCL);
+    delay(100);
+
     u8g2.begin();
+    u8g2.setPowerSave(0);
 
     u8g2.clearBuffer();
     u8g2.setFont(u8g2_font_6x12_tf);
+
+    const char* msg = "MESH INIT";
+
+    int textWidth = u8g2.getStrWidth(msg);
+
+    int x = (SCREEN_WIDTH - textWidth) / 2;
+
+    int y = (SCREEN_HEIGHT / 2);
+
+    u8g2.drawStr(x, y, msg);
+
+    u8g2.sendBuffer();
 
     oledOK = true;
 
@@ -142,7 +150,6 @@ void setup() {
 
     mesh.onReceive(&receivedCallback);
 
-    // Web
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *r){
         r->send_P(200,"text/html",index_html);
     });
@@ -165,6 +172,15 @@ void setup() {
         String json="{";
         json+="\"nodeId\":\""+String(mesh.getNodeId())+"\",";
         json+="\"nodeCount\":\""+String(mesh.getNodeList().size())+"\",";
+
+        // ✅ Added node list
+        json+="\"nodeIdList\":[";
+        auto nodes = mesh.getNodeList();
+        for(auto &&id : nodes){
+            json+="\""+String(id)+"\",";
+        }
+        json+="],";
+
         json+="\"messages\":[";
 
         for(int i=chatCount-1;i>=0;i--){
@@ -179,6 +195,11 @@ void setup() {
         json.replace(",]","]");
 
         r->send(200,"application/json",json);
+    });
+
+    // ✅ Updated nodes route (serves HTML page)
+    server.on("/nodes", HTTP_GET, [](AsyncWebServerRequest *r){
+        r->send_P(200,"text/html",nodes_html);
     });
 
     server.begin();

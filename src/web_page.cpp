@@ -112,12 +112,111 @@ for(let i=rendered;i<d.messages.length;i++){
     const m=d.messages[i];
     const div=document.createElement('div');
     div.className='msg '+(m.me?'me':'other');
-    div.textContent=(m.me?'Me: ':m.sender+': ')+m.text;
+    div.textContent = m.me ? m.text : (m.sender + ': ' + m.text);
     box.appendChild(div);
 }
 
 rendered=d.messages.length;
 box.scrollTop=box.scrollHeight;
+
+});
+}
+
+setInterval(update,1000);
+update();
+</script>
+</body>
+</html>
+)rawliteral";
+
+
+const char nodes_html[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mesh Nodes</title>
+<style>
+body{
+    margin:0;
+    padding:20px;
+    background:#000;
+    color:#fff;
+    font-family:system-ui;
+}
+.container{max-width:600px;margin:auto;}
+h1{text-align:center;margin-bottom:15px;}
+.info{
+    display:flex;
+    justify-content:space-between;
+    font-size:13px;
+    opacity:.7;
+    margin-bottom:12px;
+}
+.chat{
+    min-height:320px;
+    padding:14px;
+    border-radius:16px;
+    outline:1px solid #333;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    overflow-y:auto;
+}
+.msg{
+    max-width:80%;
+    padding:10px 14px;
+    border-radius:18px;
+    font-size:14px;
+}
+.me{
+    align-self:flex-end;
+    background:#fff;
+    color:#000;
+}
+.other{
+    align-self:flex-start;
+    border:1px solid #333;
+}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>Mesh Nodes</h1>
+
+<div class="info">
+<div>Node: <span id="nodeId">-</span></div>
+<div>Peers: <span id="nodeCount">-</span></div>
+</div>
+
+<div class="chat" id="nodes"></div>
+
+</div>
+
+<script>
+function update(){
+fetch('/data').then(r=>r.json()).then(d=>{
+
+document.getElementById('nodeId').textContent=d.nodeId;
+document.getElementById('nodeCount').textContent=d.nodeCount;
+
+const box=document.getElementById('nodes');
+box.innerHTML="";
+
+if(d.nodeCount == 0){
+    const div=document.createElement('div');
+    div.className='msg other';
+    div.textContent='No nodes...Feeling alone';
+    box.appendChild(div);
+    return;
+}
+
+for(let i=0;i<d.nodeCount;i++){
+    const div=document.createElement('div');
+    div.className='msg other';
+    div.textContent=d.nodeIdList ? d.nodeIdList[i] : "Node";
+    box.appendChild(div);
+}
 
 });
 }
