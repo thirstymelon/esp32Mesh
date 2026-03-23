@@ -412,28 +412,28 @@ Returns a JSON snapshot of the current node state.
 │                         ESP32 Node                           │
 │                                                              │
 │  Wi-Fi (SoftAP + STA)                                        │
-│  ┌──────────────┐    ┌───────────────────────────────────┐  │
-│  │ painlessMesh │◄──►│  Mesh peers (other ESP32 nodes)   │  │
-│  └──────┬───────┘    └───────────────────────────────────┘  │
+│  ┌──────────────┐    ┌───────────────────────────────────┐   │
+│  │ painlessMesh │◄──►│  Mesh peers (other ESP32 nodes)   │   │
+│  └──────┬───────┘    └───────────────────────────────────┘   │
 │         │ callbacks                                          │
-│  ┌──────▼────────────────────────────────────────────────┐  │
-│  │  main.cpp                                             │  │
-│  │  • receivedCallback  → dedup → pushMessage            │  │
-│  │  • newConnectionCallback → broadcastOwnNick           │  │
-│  │  • nicknames DB (nickDb[])                            │  │
-│  │  • chat buffer (chat[])                               │  │
-│  └──────┬──────────────────┬────────────────────────────┘  │
+│  ┌──────▼────────────────────────────────────────────────┐   │
+│  │  main.cpp                                             │   │
+│  │  • receivedCallback  → dedup → pushMessage            │   │
+│  │  • newConnectionCallback → broadcastOwnNick           │   │
+│  │  • nicknames DB (nickDb[])                            │   │
+│  │  • chat buffer (chat[])                               │   │
+│  └──────┬──────────────────┬────────────────────────────┘    │
 │         │                  │                                 │
-│  ┌──────▼──────┐   ┌───────▼──────┐                        │
-│  │  OLED       │   │  HTTP /data  │                        │
-│  │  state      │   │  JSON API    │                        │
-│  │  machine    │   └──────┬───────┘                        │
-│  └─────────────┘          │ fetch() every 1 s              │
-│                    ┌──────▼────────────────────────────┐   │
-│                    │  Browser (phone / laptop)          │   │
-│                    │  / → chat page                     │   │
-│                    │  /nodes → graph page               │   │
-│                    └───────────────────────────────────┘   │
+│  ┌──────▼──────┐   ┌───────▼──────┐                          │
+│  │  OLED       │   │  HTTP /data  │                          │
+│  │  state      │   │  JSON API    │                          │
+│  │  machine    │   └──────┬───────┘                          │
+│  └─────────────┘          │ fetch() every 1 s                │
+│                    ┌──────▼────────────────────────────┐     │
+│                    │  Browser (phone / laptop)          │    │
+│                    │  / → chat page                     │    │
+│                    │  /nodes → graph page               │    │
+│                    └───────────────────────────────────┘     │
 └──────────────────────────────────────────────────────────────┘
 ```
 
