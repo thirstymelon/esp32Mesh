@@ -5,7 +5,7 @@
 #include "web_page.h"
 #include <U8g2lib.h>
 
-/* ================= CONFIG ================= */
+// CONFIG
 
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE);
 
@@ -16,7 +16,7 @@ U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE);
 
 #define MAX_MESSAGES    20
 
-/* ================= OLED ================= */
+// OLED
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
@@ -25,7 +25,7 @@ U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE);
 
 bool oledOK = false;
 
-/* ================= STRUCT ================= */
+// STRUCT
 
 struct ChatMessage {
     String sender;
@@ -33,7 +33,7 @@ struct ChatMessage {
     bool isMe;
 };
 
-/* ================= GLOBALS ================= */
+// GLOBALS
 
 Scheduler userScheduler;
 painlessMesh mesh;
@@ -42,7 +42,7 @@ AsyncWebServer server(80);
 ChatMessage chat[MAX_MESSAGES];
 int chatCount = 0;
 
-/* ================= HELPERS ================= */
+// HELPERS
 
 void pushMessage(const String &sender, const String &text, bool isMe) {
 
@@ -63,7 +63,7 @@ String escapeJSON(const String &s) {
     return o;
 }
 
-/* ================= OLED UI ================= */
+// OLED UI
 
 void updateOLED() {
 
@@ -99,7 +99,7 @@ void updateOLED() {
     u8g2.sendBuffer();
 }
 
-/* ================= MESH ================= */
+// MESH
 
 void receivedCallback(uint32_t from, String &msg) {
 
@@ -115,7 +115,7 @@ void receivedCallback(uint32_t from, String &msg) {
     updateOLED();
 }
 
-/* ================= SETUP ================= */
+// SETUP
 
 void setup() {
 
@@ -144,7 +144,7 @@ void setup() {
 
     oledOK = true;
 
-    // Mesh
+    
     mesh.init(MESH_PREFIX, MESH_PASSWORD, &userScheduler,
               MESH_PORT, WIFI_AP_STA, MESH_CHANNEL);
 
@@ -173,7 +173,7 @@ void setup() {
         json+="\"nodeId\":\""+String(mesh.getNodeId())+"\",";
         json+="\"nodeCount\":\""+String(mesh.getNodeList().size())+"\",";
 
-        // ✅ Added node list
+
         json+="\"nodeIdList\":[";
         auto nodes = mesh.getNodeList();
         for(auto &&id : nodes){
@@ -197,7 +197,7 @@ void setup() {
         r->send(200,"application/json",json);
     });
 
-    // ✅ Updated nodes route (serves HTML page)
+
     server.on("/nodes", HTTP_GET, [](AsyncWebServerRequest *r){
         r->send_P(200,"text/html",nodes_html);
     });
@@ -205,7 +205,7 @@ void setup() {
     server.begin();
 }
 
-/* ================= LOOP ================= */
+
 
 void loop() {
     mesh.update();
