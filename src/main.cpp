@@ -1,25 +1,12 @@
-/*
- *  ESP32 Mesh Chat — main.cpp
- *  LittleFS HTML/CSS  ·  meshOS OLED  ·  nick sync  ·  OTA
- */
-
 #include <Arduino.h>
 #include <painlessMesh.h>
 #include <ESPAsyncWebServer.h>
 #include <Wire.h>
 #include <LittleFS.h>
 #include <U8g2lib.h>
-#include "ota.h"
 
-// ── Credentials from secrets.h (copy secrets.example.h → secrets.h) ──────
-#if __has_include("secrets.h")
-  #include "secrets.h"
-#else
-  #define MESH_PREFIX    "ESP32Mesh"
-  #define MESH_PASSWORD  "meshpass123"
-  #define MESH_PORT      5555
-  #define MESH_CHANNEL   6
-#endif
+#include "ota.h"
+#include "secrets.h"
 
 // ─── TUNABLES ─────────────────────────────────────────────────────────────
 #define MAX_MESSAGES   30
@@ -119,7 +106,7 @@ static String escapeJSON(const String& s) {
     return o;
 }
 
-// ── Nick helpers ──────────────────────────────────────────────────────────
+// ── NickName helpers ──────────────────────────────────────────────────────────
 static const char* ADJS[]  = {"Swift","Bold","Bright","Dark","Fast",
                                "Cool","Sharp","Wild","Keen","Calm"};
 static const char* NOUNS[] = {"Fox","Hawk","Wolf","Bear","Lynx",
