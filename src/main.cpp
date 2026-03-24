@@ -1,72 +1,78 @@
+/*
+ *  ESP32 Mesh Chat — main.cpp
+ *  LittleFS HTML/CSS  ·  meshOS OLED  ·  nick sync  ·  OTA
+ */
+
 #include <Arduino.h>
 #include <painlessMesh.h>
 #include <ESPAsyncWebServer.h>
 #include <Wire.h>
-#include "web_page.h"
+#include <LittleFS.h>
 #include <U8g2lib.h>
+#include "ota.h"
 
-// ─── CONFIG ────────────────────────────────────────────────────────────────
-#define MESH_PREFIX    "ESP32Mesh"
-#define MESH_PASSWORD  "meshpass123"
-#define MESH_PORT      5555
-#define MESH_CHANNEL   6
+// ── Credentials from secrets.h (copy secrets.example.h → secrets.h) ──────
+#if __has_include("secrets.h")
+  #include "secrets.h"
+#else
+  #define MESH_PREFIX    "ESP32Mesh"
+  #define MESH_PASSWORD  "meshpass123"
+  #define MESH_PORT      5555
+  #define MESH_CHANNEL   6
+#endif
+
+// ─── TUNABLES ─────────────────────────────────────────────────────────────
 #define MAX_MESSAGES   30
 #define MSG_HASH_POOL  48
+#define MAX_NODES      16
+#define NICK_SYNC_PFX  "__NK__"
 
-// ─── OLED ──────────────────────────────────────────────────────────────────
-#define SCREEN_W  128
-#define SCREEN_H   64
-#define I2C_SDA    21
-#define I2C_SCL    22
+// ─── OLED ─────────────────────────────────────────────────────────────────
+#define SCREEN_W   128
+#define SCREEN_H    64
+#define I2C_SDA     21
+#define I2C_SCL     22
 
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE);
 bool oledOK = false;
 
-// ─── NICKNAME DB ───────────────────────────────────────────────────────────
-#define MAX_NODES 16
-// Prefix that distinguishes nickname-sync packets from chat packets
-#define NICK_SYNC_PREFIX "__NK__"
+// ─── OLED TIMINGS ─────────────────────────────────────────────────────────
+#define O_FPS_MS       75
+#define O_BLINK_MS    520
+#define O_SCAN_MS     340
+#define O_FLASH_MS   1800
+#define O_MSG_TIMEOUT 10000
+
+// ─── DATA STRUCTURES ──────────────────────────────────────────────────────
+struct ChatMessage {
+    String   sender;   // decimal uint32 string
+    String   text;
+    bool     isMe;
+    bool     isDM;
+    uint32_t ts;       // mesh µs / 1000
+};
 
 struct NodeEntry {
     uint32_t id;
     String   nick;
 };
-NodeEntry nickDb[MAX_NODES];
-int       nickDbCount = 0;
 
-// Auto-generate a deterministic name from a node ID.
-// 10 adjectives × 10 nouns = 100 unique combos — plenty for a small mesh.
-String autoNick(uint32_t id) {
-    static const char* ADJS[]  = {
-        "Swift","Bold","Bright","Dark","Fast",
-        "Cool","Sharp","Wild","Keen","Calm"
-    };
-    static const char* NOUNS[] = {
-        "Fox","Hawk","Wolf","Bear","Lynx",
-        "Kite","Wren","Crab","Moth","Ibis"
-    };
-    return String(ADJS[id % 10]) + String(NOUNS[(id >> 4) % 10]);
-}
+// ─── GLOBALS ──────────────────────────────────────────────────────────────
+Scheduler      userScheduler;
+painlessMesh   mesh;
+AsyncWebServer server(80);
 
-// Return stored nickname for a node, or auto-generated fallback.
-String getNick(uint32_t id) {
-    for (int i = 0; i < nickDbCount; i++)
-        if (nickDb[i].id == id) return nickDb[i].nick;
-    return autoNick(id);
-}
+ChatMessage chat[MAX_MESSAGES];
+int         chatCount = 0;
 
-// Upsert a nickname into the local DB.
-void storeNick(uint32_t id, const String &nick) {
-    for (int i = 0; i < nickDbCount; i++) {
-        if (nickDb[i].id == id) { nickDb[i].nick = nick; return; }
-    }
-    if (nickDbCount < MAX_NODES)
-        nickDb[nickDbCount++] = { id, nick };
-}
+NodeEntry   nickDb[MAX_NODES];
+int         nickCount = 0;
 
-// ─── OLED STATE MACHINE ────────────────────────────────────────────────────
+uint32_t    hashes[MSG_HASH_POOL] = {};
+int         hashHead = 0;
+
+// ─── OLED STATE ───────────────────────────────────────────────────────────
 enum OledScreen { SCR_STATUS, SCR_MESSAGES };
-
 OledScreen oScreen    = SCR_STATUS;
 uint32_t   oMsgTimer  = 0;
 uint32_t   oLastDraw  = 0;
@@ -77,89 +83,116 @@ uint32_t   oScanT     = 0;
 bool       oNewFlash  = false;
 uint32_t   oNewFlashT = 0;
 
-#define O_FPS_MS      75
-#define O_BLINK_MS    520
-#define O_SCAN_MS     340
-#define O_FLASH_MS    1800
-#define O_MSG_TIMEOUT 10000
-
-// ─── DATA ──────────────────────────────────────────────────────────────────
-struct ChatMessage {
-    String   sender;   // full uint32_t as decimal string
-    String   text;
-    bool     isMe;
-    uint32_t ts;
-};
-
-// ─── GLOBALS ───────────────────────────────────────────────────────────────
-Scheduler      userScheduler;
-painlessMesh   mesh;
-AsyncWebServer server(80);
-
-ChatMessage chat[MAX_MESSAGES];
-int         chatCount = 0;
-
-uint32_t msgHashes[MSG_HASH_POOL] = {};
-int      hashHead = 0;
-
-// Broadcast this node's own nickname across the mesh.
-// Defined here (after mesh global) so mesh is in scope.
-void broadcastOwnNick() {
-    String own = getNick(mesh.getNodeId());
-    String pkt = String(NICK_SYNC_PREFIX)
-               + String(mesh.getNodeId()) + "|" + own;
-    mesh.sendBroadcast(pkt);
-}
-
-// ─── HELPERS ───────────────────────────────────────────────────────────────
-uint32_t simpleHash(const String &s) {
+// ─── HELPERS ──────────────────────────────────────────────────────────────
+static uint32_t djb2(const String& s) {
     uint32_t h = 5381;
     for (char c : s) h = ((h << 5) + h) ^ (uint8_t)c;
     return h ? h : 1;
 }
 
-bool isDuplicate(const String &payload) {
-    uint32_t h = simpleHash(payload);
+static bool isDuplicate(const String& msg) {
+    uint32_t h = djb2(msg);
     for (int i = 0; i < MSG_HASH_POOL; i++)
-        if (msgHashes[i] == h) return true;
-    msgHashes[hashHead] = h;
+        if (hashes[i] == h) return true;
+    hashes[hashHead] = h;
     hashHead = (hashHead + 1) % MSG_HASH_POOL;
     return false;
 }
 
-void pushMessage(const String &sender, const String &text, bool isMe) {
+static void pushMessage(const String& sender, const String& text,
+                        bool isMe, bool isDM = false) {
     if (chatCount < MAX_MESSAGES) chatCount++;
-    for (int i = chatCount - 1; i > 0; i--)
-        chat[i] = chat[i - 1];
-    chat[0] = { sender, text, isMe, (uint32_t)mesh.getNodeTime() / 1000 };
+    for (int i = chatCount - 1; i > 0; i--) chat[i] = chat[i - 1];
+    chat[0] = { sender, text, isMe, isDM,
+                (uint32_t)(mesh.getNodeTime() / 1000ULL) };
 }
 
-String escapeJSON(const String &s) {
-    String o;
-    o.reserve(s.length() + 4);
+static String escapeJSON(const String& s) {
+    String o; o.reserve(s.length() + 4);
     for (char c : s) {
         if      (c == '"')  o += "\\\"";
         else if (c == '\\') o += "\\\\";
         else if (c == '\n') o += "\\n";
-        else if (c == '\r') o += "\\r";
+        else if (c == '\r') ; // drop
         else                o += c;
     }
     return o;
 }
 
-// ─── OLED PRIMITIVES ───────────────────────────────────────────────────────
-void oledBars(int x, int y, int peers) {
-    const uint8_t bh[3] = { 3, 5, 7 };
+// ── Nick helpers ──────────────────────────────────────────────────────────
+static const char* ADJS[]  = {"Swift","Bold","Bright","Dark","Fast",
+                               "Cool","Sharp","Wild","Keen","Calm"};
+static const char* NOUNS[] = {"Fox","Hawk","Wolf","Bear","Lynx",
+                               "Kite","Wren","Crab","Moth","Ibis"};
+
+static String autoNick(uint32_t id) {
+    return String(ADJS[id % 10]) + String(NOUNS[(id >> 4) % 10]);
+}
+
+static String getNick(uint32_t id) {
+    for (int i = 0; i < nickCount; i++)
+        if (nickDb[i].id == id) return nickDb[i].nick;
+    return autoNick(id);
+}
+
+static void storeNick(uint32_t id, const String& nick) {
+    for (int i = 0; i < nickCount; i++) {
+        if (nickDb[i].id == id) { nickDb[i].nick = nick; return; }
+    }
+    if (nickCount < MAX_NODES) nickDb[nickCount++] = { id, nick };
+}
+
+static void broadcastNick() {
+    String pkt = String(NICK_SYNC_PFX) + String(mesh.getNodeId())
+               + "|" + getNick(mesh.getNodeId());
+    mesh.sendBroadcast(pkt);
+}
+
+// ── File serving helper — checks html_gz/*.gz first ──────────────────────
+static void sendFile(AsyncWebServerRequest* r,
+                     const char* htmlPath, const char* mime) {
+    // Build gz candidate: "/index.html" → "/html_gz/index.html.gz"
+    String fname = String(htmlPath).substring(1); // strip leading /
+    String gz    = "/html_gz/" + fname + ".gz";
+
+    if (LittleFS.exists(gz)) {
+        auto res = r->beginResponse(LittleFS, gz, mime);
+        res->addHeader("Content-Encoding", "gzip");
+        res->addHeader("Cache-Control",    "no-cache");
+        r->send(res);
+        return;
+    }
+    // Fall back to template/ directory
+    String tmpl = "/template/" + fname;
+    if (LittleFS.exists(tmpl)) {
+        auto res = r->beginResponse(LittleFS, tmpl, mime);
+        res->addHeader("Cache-Control", "no-cache");
+        r->send(res);
+        return;
+    }
+    // Bare path
+    if (LittleFS.exists(htmlPath)) {
+        auto res = r->beginResponse(LittleFS, htmlPath, mime);
+        res->addHeader("Cache-Control", "no-cache");
+        r->send(res);
+        return;
+    }
+    r->send(404, "text/plain",
+            String(htmlPath) + " not found — run build.sh then pio run -t uploadfs");
+}
+
+// ─── OLED PRIMITIVES ──────────────────────────────────────────────────────
+static void oledBars(int x, int y, int peers) {
+    const uint8_t bh[3] = {3, 5, 7};
     int filled = min(peers, 3);
     for (int i = 0; i < 3; i++) {
-        int bx = x + i * 3;
-        int by = y - bh[i] + 1;
+        int bx = x + i * 3, by = y - bh[i] + 1;
         if (i < filled) u8g2.drawBox(bx, by, 2, bh[i]);
         else            u8g2.drawFrame(bx, by, 2, bh[i]);
     }
 }
 
-void oledHeader(const char *label) {
+static void oledHeader(const char* label) {
     int peers = (int)mesh.getNodeList().size();
     u8g2.setFont(u8g2_font_5x7_tf);
     if (peers > 0 && oBlink) u8g2.drawDisc(3, 4, 2);
@@ -170,8 +203,8 @@ void oledHeader(const char *label) {
     u8g2.drawLine(0, 11, SCREEN_W, 11);
 }
 
-// ─── SCREEN: STATUS ────────────────────────────────────────────────────────
-void oledDrawStatus() {
+// ─── SCREEN: STATUS ───────────────────────────────────────────────────────
+static void oledDrawStatus() {
     u8g2.clearBuffer();
     oledHeader("MESH OS");
 
@@ -180,24 +213,22 @@ void oledDrawStatus() {
     if (peers > 0) {
         u8g2.drawDisc(7, 22, 4);
         u8g2.setFont(u8g2_font_6x10_tf);
-        u8g2.setCursor(16, 26);
-        u8g2.print("ONLINE");
+        u8g2.setCursor(16, 26); u8g2.print("ONLINE");
     } else {
         u8g2.drawCircle(7, 22, 4);
         u8g2.setFont(u8g2_font_6x10_tf);
-        u8g2.setCursor(16, 26);
-        u8g2.print("SCANNING");
+        u8g2.setCursor(16, 26); u8g2.print("SCANNING");
         u8g2.setFont(u8g2_font_5x7_tf);
-        for (int i = 0; i < (int)oScanDot; i++) u8g2.print(".");
+        for (int i = 0; i < (int)oScanDot; i++) u8g2.print('.');
     }
 
-    // Own nickname (large-ish, centred)
+    // Own nickname centred large
     u8g2.setFont(u8g2_font_6x13B_tf);
     String nick = getNick(mesh.getNodeId());
     int tw = u8g2.getStrWidth(nick.c_str());
     u8g2.drawStr((SCREEN_W - tw) / 2, 43, nick.c_str());
 
-    // Node ID (small, centred below nickname)
+    // Short node ID below nick
     u8g2.setFont(u8g2_font_4x6_tf);
     String nid = String(mesh.getNodeId()).substring(0, 8);
     tw = u8g2.getStrWidth(nid.c_str());
@@ -206,22 +237,19 @@ void oledDrawStatus() {
     // Stats row
     u8g2.setFont(u8g2_font_5x7_tf);
     String pl = String(peers) + (peers == 1 ? " peer" : " peers");
-    u8g2.setCursor(0, 54);
-    u8g2.print(pl);
+    u8g2.setCursor(0, 54); u8g2.print(pl);
     if (chatCount > 0) {
         String ml = String(chatCount) + " msg";
         tw = u8g2.getStrWidth(ml.c_str());
-        u8g2.setCursor(SCREEN_W - tw, 54);
-        u8g2.print(ml);
+        u8g2.setCursor(SCREEN_W - tw, 54); u8g2.print(ml);
     }
 
-    // Mesh-synced uptime clock
-    uint32_t sec = (uint32_t)(mesh.getNodeTime() / 1000000ULL);
-    uint32_t mn  = sec / 60; sec %= 60;
-    uint32_t hr  = mn  / 60; mn  %= 60;
+    // Mesh-synced uptime
+    uint32_t s = (uint32_t)(mesh.getNodeTime() / 1000000ULL);
+    uint32_t m = s / 60; s %= 60;
+    uint32_t h = m / 60; m %= 60;
     char up[16];
-    snprintf(up, sizeof(up), "up %02u:%02u:%02u",
-             (unsigned)hr, (unsigned)mn, (unsigned)sec);
+    snprintf(up, sizeof(up), "up %02u:%02u:%02u", h, m, s);
     u8g2.setFont(u8g2_font_4x6_tf);
     tw = u8g2.getStrWidth(up);
     u8g2.drawStr((SCREEN_W - tw) / 2, 63, up);
@@ -229,48 +257,40 @@ void oledDrawStatus() {
     u8g2.sendBuffer();
 }
 
-// ─── SCREEN: MESSAGES ──────────────────────────────────────────────────────
-void oledDrawMessages() {
+// ─── SCREEN: MESSAGES ─────────────────────────────────────────────────────
+static void oledDrawMessages() {
     u8g2.clearBuffer();
-    char hdr[16];
+    char hdr[18];
     snprintf(hdr, sizeof(hdr), "MSGS [%d]", chatCount);
     oledHeader(hdr);
 
     u8g2.setFont(u8g2_font_5x8_tf);
 
-    int showCount = min(chatCount, 4);
-    int firstIdx  = showCount - 1;
-
-    bool flashLit = oNewFlash &&
-                    (((millis() - oNewFlashT) / 300) % 2 == 0);
+    int show  = min(chatCount, 4);
+    bool flit = oNewFlash && (((millis() - oNewFlashT) / 300) % 2 == 0);
 
     int y = 21;
-    for (int i = firstIdx; i >= 0; i--) {
-        bool isNewest = (i == 0);
-
-        if (isNewest && flashLit) {
-            u8g2.setDrawColor(1);
-            u8g2.drawBox(0, y - 8, SCREEN_W, 10);
+    for (int i = show - 1; i >= 0; i--) {
+        bool newest = (i == 0);
+        if (newest && flit) {
+            u8g2.setDrawColor(1); u8g2.drawBox(0, y - 8, SCREEN_W, 10);
             u8g2.setDrawColor(0);
         }
 
-        String senderDisplay;
+        String pfx;
         if (chat[i].isMe) {
-            senderDisplay = ">";
+            pfx = chat[i].isDM ? "DM>" : ">";
         } else {
-            // Show own nick of the sender if known, else short ID
             uint32_t sid = (uint32_t)strtoul(chat[i].sender.c_str(), nullptr, 10);
-            String sn = getNick(sid);
-            senderDisplay = sn.substring(0, min((int)sn.length(), 5)) + ":";
+            pfx = getNick(sid).substring(0, 5) + (chat[i].isDM ? "!:" : ":");
         }
 
-        String line = senderDisplay + " " + chat[i].text;
+        String line = pfx + " " + chat[i].text;
         if ((int)line.length() > 25) line = line.substring(0, 24) + '~';
 
-        u8g2.setCursor(0, y);
-        u8g2.print(line);
+        u8g2.setCursor(0, y); u8g2.print(line);
 
-        if (isNewest && flashLit) u8g2.setDrawColor(1);
+        if (newest && flit) u8g2.setDrawColor(1);
         y += 11;
     }
 
@@ -286,15 +306,15 @@ void oledDrawMessages() {
 
     uint32_t elapsed = millis() - oMsgTimer;
     if (elapsed < (uint32_t)O_MSG_TIMEOUT) {
-        int barW = (int)((float)(O_MSG_TIMEOUT - elapsed) / O_MSG_TIMEOUT * 70);
-        if (barW > 0) u8g2.drawBox(SCREEN_W - barW, 59, barW, 3);
+        int bw = (int)((float)(O_MSG_TIMEOUT - elapsed) / O_MSG_TIMEOUT * 72);
+        if (bw > 0) u8g2.drawBox(SCREEN_W - bw, 59, bw, 3);
     }
 
     u8g2.sendBuffer();
 }
 
-// ─── PUBLIC OLED API ───────────────────────────────────────────────────────
-void oledTriggerMessages() {
+// ─── OLED API ─────────────────────────────────────────────────────────────
+static void oledTriggerMessages() {
     if (!oledOK) return;
     oScreen    = SCR_MESSAGES;
     oMsgTimer  = millis();
@@ -303,7 +323,7 @@ void oledTriggerMessages() {
     oLastDraw  = 0;
 }
 
-void updateOLED() {
+static void updateOLED() {
     if (!oledOK) return;
     uint32_t now = millis();
     if (now - oLastDraw < O_FPS_MS) return;
@@ -311,8 +331,8 @@ void updateOLED() {
 
     if (now - oBlinkT >= O_BLINK_MS) { oBlink = !oBlink; oBlinkT = now; }
     if (now - oScanT  >= O_SCAN_MS)  { oScanDot = (oScanDot + 1) % 4; oScanT = now; }
-    if (oNewFlash && (now - oNewFlashT >= O_FLASH_MS)) oNewFlash = false;
-    if (oScreen == SCR_MESSAGES && (now - oMsgTimer >= (uint32_t)O_MSG_TIMEOUT))
+    if (oNewFlash && now - oNewFlashT >= O_FLASH_MS) oNewFlash = false;
+    if (oScreen == SCR_MESSAGES && now - oMsgTimer >= (uint32_t)O_MSG_TIMEOUT)
         oScreen = SCR_STATUS;
 
     switch (oScreen) {
@@ -321,28 +341,30 @@ void updateOLED() {
     }
 }
 
-// ─── MESH CALLBACKS ────────────────────────────────────────────────────────
-void receivedCallback(uint32_t from, String &msg) {
+// ─── MESH CALLBACKS ───────────────────────────────────────────────────────
+void receivedCallback(uint32_t from, String& msg) {
     if (isDuplicate(msg)) return;
 
-    // ── Nickname sync packet ─────────────────────────────────────────────
-    if (msg.startsWith(NICK_SYNC_PREFIX)) {
-        String body = msg.substring(strlen(NICK_SYNC_PREFIX));
+    // Hand off to OTA handler first
+    if (handleOTAMessage(msg, from)) return;
+
+    // Nick sync packet
+    if (msg.startsWith(NICK_SYNC_PFX)) {
+        String body = msg.substring(strlen(NICK_SYNC_PFX));
         int sep = body.indexOf('|');
         if (sep > 0) {
-            uint32_t id  = (uint32_t)strtoul(body.substring(0, sep).c_str(), nullptr, 10);
+            uint32_t id   = (uint32_t)strtoul(body.substring(0, sep).c_str(), nullptr, 10);
             String   nick = body.substring(sep + 1);
             nick.trim();
             if (nick.length() > 0 && nick.length() <= 20) {
                 storeNick(id, nick);
-                // Re-broadcast to propagate to further nodes (dedup prevents loops)
-                mesh.sendBroadcast(msg);
+                mesh.sendBroadcast(msg);   // relay for multi-hop (dedup stops loops)
             }
         }
         return;
     }
 
-    // ── Regular chat packet ──────────────────────────────────────────────
+    // Regular chat packet: "senderId|text"
     int sep = msg.indexOf('|');
     if (sep < 0) return;
 
@@ -351,39 +373,38 @@ void receivedCallback(uint32_t from, String &msg) {
 
     if (sender == String(mesh.getNodeId())) return;   // drop self-echo
 
-    pushMessage(sender, text, false);   // store full ID string as sender
+    pushMessage(sender, text, false);
     oledTriggerMessages();
 }
 
 void newConnectionCallback(uint32_t nodeId) {
-    Serial.printf("[MESH] +Node: %u  |  total: %d\n",
+    Serial.printf("[MESH] +Node %u  peers=%d\n",
                   nodeId, (int)mesh.getNodeList().size());
-    // Re-announce own nickname so newly joined node learns it
-    broadcastOwnNick();
+    broadcastNick();
     oLastDraw = 0;
 }
 
 void droppedConnectionCallback(uint32_t nodeId) {
-    Serial.printf("[MESH] -Node: %u  |  total: %d\n",
+    Serial.printf("[MESH] -Node %u  peers=%d\n",
                   nodeId, (int)mesh.getNodeList().size());
     oLastDraw = 0;
 }
 
 void changedConnectionsCallback() {
-    Serial.printf("[MESH] Topology changed | nodes: %d\n",
+    Serial.printf("[MESH] Topology changed  peers=%d\n",
                   (int)mesh.getNodeList().size());
     oLastDraw = 0;
 }
 
 void nodeTimeAdjustedCallback(int32_t offset) {
-    Serial.printf("[MESH] Time adj: %d µs\n", offset);
+    Serial.printf("[MESH] Time adj %d µs\n", offset);
 }
 
-// ─── BOOT SPLASH ───────────────────────────────────────────────────────────
-static void bootSplash(const char *status, const char *detail = nullptr) {
+// ─── BOOT SPLASH ──────────────────────────────────────────────────────────
+static void bootSplash(const char* status, const char* detail = nullptr) {
     u8g2.clearBuffer();
     u8g2.setFont(u8g2_font_7x13B_tf);
-    const char *title = "MESH  OS";
+    const char* title = "MESH  OS";
     int tw = u8g2.getStrWidth(title);
     u8g2.drawStr((SCREEN_W - tw) / 2, 22, title);
     u8g2.drawLine(14, 27, SCREEN_W - 14, 27);
@@ -398,17 +419,28 @@ static void bootSplash(const char *status, const char *detail = nullptr) {
     u8g2.sendBuffer();
 }
 
-// ─── SETUP ─────────────────────────────────────────────────────────────────
+// ─── SETUP ────────────────────────────────────────────────────────────────
 void setup() {
     Serial.begin(115200);
 
+    // ── LittleFS ──────────────────────────────────────────────────────────
+    if (!LittleFS.begin(true)) {
+        Serial.println("[BOOT] LittleFS mount failed");
+    } else {
+        Serial.printf("[BOOT] LittleFS OK  used=%u  total=%u\n",
+                      (unsigned)LittleFS.usedBytes(),
+                      (unsigned)LittleFS.totalBytes());
+    }
+
+    // ── OLED ──────────────────────────────────────────────────────────────
     Wire.begin(I2C_SDA, I2C_SCL);
-    delay(100);
+    delay(80);
     u8g2.begin();
     u8g2.setPowerSave(0);
     oledOK = true;
     bootSplash("initializing...");
 
+    // ── Mesh ──────────────────────────────────────────────────────────────
     mesh.setDebugMsgTypes(ERROR | STARTUP);
     mesh.init(MESH_PREFIX, MESH_PASSWORD, &userScheduler,
               MESH_PORT, WIFI_AP_STA, MESH_CHANNEL);
@@ -419,18 +451,24 @@ void setup() {
     mesh.onChangedConnections(&changedConnectionsCallback);
     mesh.onNodeTimeAdjusted(&nodeTimeAdjustedCallback);
 
-    // ── Register own nickname in DB and broadcast it ──────────────────
+    // Store own auto-nick
     uint32_t myId = mesh.getNodeId();
     storeNick(myId, autoNick(myId));
-    // Broadcast deferred to newConnectionCallback when first peer appears
 
-    // ── HTTP routes ───────────────────────────────────────────────────
+    // ── HTTP routes ────────────────────────────────────────────────────────
 
-    server.on("/", HTTP_GET, [](AsyncWebServerRequest *r) {
-        r->send(200, "text/html", index_html);
+    server.on("/", HTTP_GET, [](AsyncWebServerRequest* r) {
+        sendFile(r, "/index.html", "text/html");
     });
+    server.on("/nodes", HTTP_GET, [](AsyncWebServerRequest* r) {
+        sendFile(r, "/nodes.html", "text/html");
+    });
+    // /update GET+POST handled by setupOTA
+    server.serveStatic("/style/", LittleFS, "/style/")
+          .setCacheControl("max-age=86400");
 
-    server.on("/send", HTTP_GET, [](AsyncWebServerRequest *r) {
+    // ── Send message ──────────────────────────────────────────────────────
+    server.on("/send", HTTP_GET, [](AsyncWebServerRequest* r) {
         if (r->hasParam("msg")) {
             String text = r->getParam("msg")->value();
             text.trim();
@@ -446,89 +484,89 @@ void setup() {
         r->send(200, "text/plain", "OK");
     });
 
-    // Set (or update) a nickname — broadcasts the change to the whole mesh
-    server.on("/setnick", HTTP_GET, [](AsyncWebServerRequest *r) {
-        if (r->hasParam("id") && r->hasParam("nick")) {
-            uint32_t id  = (uint32_t)strtoul(
-                r->getParam("id")->value().c_str(), nullptr, 10);
-            String nick = r->getParam("nick")->value();
-            nick.trim();
-            if (nick.length() == 0 || nick.length() > 20) {
-                r->send(400, "text/plain", "bad nick");
-                return;
-            }
-            storeNick(id, nick);
-            // Build and broadcast the sync packet
-            String pkt = String(NICK_SYNC_PREFIX) + String(id) + "|" + nick;
-            mesh.sendBroadcast(pkt);
+    // ── Set nickname ──────────────────────────────────────────────────────
+    server.on("/setnick", HTTP_GET, [](AsyncWebServerRequest* r) {
+        if (!r->hasParam("id") || !r->hasParam("nick")) {
+            r->send(400, "text/plain", "missing params"); return;
         }
+        uint32_t id  = (uint32_t)strtoul(
+            r->getParam("id")->value().c_str(), nullptr, 10);
+        String nick = r->getParam("nick")->value();
+        nick.trim();
+        if (!nick.length() || nick.length() > 20) {
+            r->send(400, "text/plain", "bad nick"); return;
+        }
+        storeNick(id, nick);
+        // Broadcast to mesh
+        String pkt = String(NICK_SYNC_PFX) + String(id) + "|" + nick;
+        mesh.sendBroadcast(pkt);
         r->send(200, "text/plain", "OK");
     });
 
-    server.on("/data", HTTP_GET, [](AsyncWebServerRequest *r) {
-        String json = "{";
-        json += "\"nodeId\":\""   + String(mesh.getNodeId()) + "\",";
+    // ── Data API ─────────────────────────────────────────────────────────
+    server.on("/data", HTTP_GET, [](AsyncWebServerRequest* r) {
+        uint32_t myId = mesh.getNodeId();
+        auto     nl   = mesh.getNodeList();
 
-        auto nodes = mesh.getNodeList();
-        json += "\"nodeCount\":"  + String(nodes.size())     + ",";
+        String j = "{";
+        j += "\"nodeId\":\""   + String(myId)    + "\",";
+        j += "\"nodeCount\":"  + String(nl.size()) + ",";
+        j += "\"meshTime\":"   + String(mesh.getNodeTime()) + ",";
+        j += "\"topology\":"   + mesh.subConnectionJson() + ",";
 
-        json += "\"peers\":[";
+        // Peers array
+        j += "\"peers\":[";
         bool fn = true;
-        for (auto &id : nodes) {
-            if (!fn) json += ",";
-            json += "\"" + String(id) + "\"";
+        for (auto& id : nl) {
+            if (!fn) j += ",";
+            j += "\"" + String(id) + "\"";
             fn = false;
         }
-        json += "],";
+        j += "],";
 
-        json += "\"topology\":"   + mesh.subConnectionJson() + ",";
-
-        // Mesh-synchronized time (µs)
-        json += "\"meshTime\":"   + String(mesh.getNodeTime()) + ",";
-
-        // All known nicknames
-        json += "\"nicknames\":[";
-        bool fnk = true;
-        for (int i = 0; i < nickDbCount; i++) {
-            if (!fnk) json += ",";
-            json += "{\"id\":\"" + String(nickDb[i].id) + "\","
-                    "\"nick\":\"" + escapeJSON(nickDb[i].nick) + "\"}";
-            fnk = false;
+        // Nicknames
+        j += "\"nicknames\":[";
+        for (int i = 0; i < nickCount; i++) {
+            if (i) j += ",";
+            j += "{\"id\":\"" + String(nickDb[i].id)
+               + "\",\"nick\":\"" + escapeJSON(nickDb[i].nick) + "\"}";
         }
-        json += "],";
+        j += "],";
 
-        // Messages (oldest → newest)
-        json += "\"messages\":[";
+        // Messages (oldest → newest so browser can append)
+        j += "\"messages\":[";
         bool fm = true;
         for (int i = chatCount - 1; i >= 0; i--) {
-            if (!fm) json += ",";
-            json += "{\"sender\":\"" + escapeJSON(chat[i].sender) + "\","
-                    "\"text\":\""    + escapeJSON(chat[i].text)   + "\","
-                    "\"ts\":"        + String(chat[i].ts)          + ","
-                    "\"me\":"        + (chat[i].isMe ? "true" : "false") + "}";
+            if (!fm) j += ",";
+            j += "{\"sender\":\"" + escapeJSON(chat[i].sender) + "\","
+               + "\"text\":\""    + escapeJSON(chat[i].text)   + "\","
+               + "\"ts\":"        + String(chat[i].ts)          + ","
+               + "\"dm\":"        + (chat[i].isDM  ? "true" : "false") + ","
+               + "\"me\":"        + (chat[i].isMe  ? "true" : "false") + "}";
             fm = false;
         }
-        json += "]}";
-        r->send(200, "application/json", json);
+        j += "]}";
+
+        r->send(200, "application/json", j);
     });
 
-    server.on("/nodes", HTTP_GET, [](AsyncWebServerRequest *r) {
-        r->send(200, "text/html", nodes_html);
-    });
+    // ── OTA (GET /update served here too, POST handled in setupOTA) ───────
+    setupOTA(server, mesh);
 
     server.begin();
 
+    // Show own nick on splash
     String nick = getNick(myId);
     bootSplash(("hi, " + nick).c_str(),
                String(myId).substring(0, 8).c_str());
-    delay(1000);
+    delay(900);
 
-    Serial.printf("[BOOT] Node %u (%s) ready\n",
-                  myId, nick.c_str());
+    Serial.printf("[BOOT] Node %u  nick=%s  ready\n", myId, nick.c_str());
 }
 
-// ─── LOOP ──────────────────────────────────────────────────────────────────
+// ─── LOOP ─────────────────────────────────────────────────────────────────
 void loop() {
     mesh.update();
     updateOLED();
+    loopOTA();   // drives mesh OTA chunk distribution (no-op when idle)
 }

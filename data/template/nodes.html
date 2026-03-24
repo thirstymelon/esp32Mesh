@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mesh Nodes</title>
+<link rel="stylesheet" href="/style/nodes.css">
+</head>
+<body>
+<div class="header">
+  <h1>Mesh Nodes</h1>
+  <div class="info">
+    <span>Node: <b id="hSelf">—</b></span>
+    <span>Peers: <b id="hCount">0</b></span>
+  </div>
+</div>
+
+<div class="main">
+  <div class="graph-wrap">
+    <canvas id="cvs"></canvas>
+    <div id="tooltip"></div>
+  </div>
+
+  <div class="sidebar">
+    <div class="sidebar-title">// nodes</div>
+    <div id="node-list"></div>
+  </div>
+</div>
+
+<nav class="nav">
+  <a href="/">Chat</a>
+  <a href="/update">Update</a>
+</nav>
+
+<script>
+(function () {
+  /* ── State ─────────────────────────────────────────────────────────── */
+  var selfId  = '';
+  var peers   = [];
+  var nickMap = {};
+  var nodes   = [];       // canvas physics objects
+  var tick    = 0;
+  var hoverId = null;
+  var lastData = {};
+
+  /* ── Canvas ─────────────────────────────────────────────────────────── */
+  var cvs     = document.getElementById('cvs');
+  var ctx     = cvs.getContext('2d');
+  var tooltip = document.getElementById('tooltip');
+  var wrap    = cvs.parentElement;
+
+  /* Monochrome palette */
+  var C_BG    = '#000000';
+  var C_GRID  = 'rgba(255,255,255,0.022)';
+  var C_EDGE  = 'rgba(255,255,255,0.13)';
+  var C_LABEL = 'rgba(255,255,255,0.90)';
+  var C_SUB   = 'rgba(255,255,255,0.32)';
+  var FONT    = 'system-ui, sans-serif';
+
+  /* ── Resize ──────────────────────────────────────────────────────────── */
+  function resize() {
+    cvs.width  = wrap.clientWidth  * devicePixelRatio;
+    cvs.height = wrap.clientHeight * devicePixelRatio;
+    ctx.setTransform(1,0,0,1,0,0);
+    ctx.scale(devicePixelRatio, devicePixelRatio);
+  }
+  window.addEventListener('resize', resize);
+
+  /* ── Upsert node — random initial position ───────────────────────────── */
+  function upsert(id, isSelf) {
+    var n = nodes.find(function(x){ return x.id === id; });
+    if (!n) {
+      var W = wrap.clientWidth, H = wrap.clientHeight;
+      var m = 40;
+      n = {
+        id:    id,
+        isSelf: isSelf,
+        x:     isSelf ? W/2 : m + Math.random() * (W - m*2),
+        y:     isSelf ? H/2 : m + Math.random() * (H - m*2),
+        vx: (Math.random()-0.5) * 2,
+        vy: (Math.random()-0.5) * 2,
+        r:     isSelf ? 22 : 15,
+        pulse: Math.random() * Math.PI * 2
+      };
+      nodes.push(n);
+    }
+    return n;
+  }
+
+  /* ── Sync node list to current peers ────────────────────────────────── */
+  function syncNodes() {
+    if (selfId) upsert(selfId, true);
+    peers.forEach(function(pid){ upsert(pid, false); });
+    nodes = nodes.filter(function(n){
+      return n.isSelf ? n.id === selfId : peers.indexOf(n.id) !== -1;
+    });
+  }
+
+  /* ── Force simulation ───────────────────────────────────────────────── */
+  function simulate() {
+    var W = wrap.clientWidth, H = wrap.clientHeight;
+    var REPEL   = 5000;
+    var SPRING  = 0.022;
+    var IDEAL   = Math.min(W, H) * 0.30;
+    var DAMP    = 0.84;
+    var C_PULL  = 0.005;
+
+    var selfNode = nodes.find(function(n){ return n.isSelf; });
+
+    for (var i = 0; i < nodes.length; i++) {
+      var a = nodes[i];
+
+      /* repulsion from all other nodes */
+      for (var j = 0; j < nodes.length; j++) {
+        if (i === j) continue;
+        var b  = nodes[j];
+        var dx = a.x - b.x, dy = a.y - b.y;
+        var d2 = dx*dx + dy*dy || 0.01;
+        var dist = Math.sqrt(d2);
+        if (dist < 250) {
+          var f  = REPEL / d2;
+          a.vx  += (dx/dist) * f;
+          a.vy  += (dy/dist) * f;
+        }
+      }
+
+      /* spring to self for peer nodes */
+      if (!a.isSelf && selfNode) {
+        var dx = selfNode.x - a.x, dy = selfNode.y - a.y;
+        var dist = Math.sqrt(dx*dx + dy*dy) || 0.01;
+        var stretch = dist - IDEAL;
+        a.vx += (dx/dist) * stretch * SPRING;
+        a.vy += (dy/dist) * stretch * SPRING;
+        /* counter-force on self (lighter) */
+        selfNode.vx -= (dx/dist) * stretch * SPRING * 0.25;
+        selfNode.vy -= (dy/dist) * stretch * SPRING * 0.25;
+      }
+
+      /* gentle pull to center */
+      a.vx += (W/2 - a.x) * C_PULL;
+      a.vy += (H/2 - a.y) * C_PULL;
+
+      /* damping + integrate */
+      a.vx *= DAMP;
+      a.vy *= DAMP;
+      a.x  += a.vx;
+      a.y  += a.vy;
+
+      /* boundary */
+      var mg = a.r + 22;
+      a.x = Math.max(mg, Math.min(W - mg, a.x));
+      a.y = Math.max(mg, Math.min(H - mg, a.y));
+
+      /* pulse ticker */
+      a.pulse = (a.pulse + 0.035) % (2 * Math.PI);
+    }
+  }
+
+  /* ── Draw one frame ─────────────────────────────────────────────────── */
+  function draw() {
+    var W = wrap.clientWidth, H = wrap.clientHeight;
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = C_BG;
+    ctx.fillRect(0, 0, W, H);
+
+    /* grid */
+    ctx.strokeStyle = C_GRID;
+    ctx.lineWidth   = 1;
+    var gs = 38;
+    for (var x = 0; x < W; x += gs) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+    for (var y = 0; y < H; y += gs) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+
+    tick += 0.022;
+
+    simulate();
+
+    var selfNode = nodes.find(function(n){ return n.isSelf; });
+
+    /* edges */
+    if (selfNode) {
+      nodes.forEach(function(n){
+        if (n.isSelf) return;
+        ctx.save();
+        ctx.setLineDash([5, 8]);
+        ctx.lineDashOffset = -((tick * 30) % 26);
+        ctx.strokeStyle = C_EDGE;
+        ctx.lineWidth   = 1;
+        ctx.beginPath();
+        ctx.moveTo(selfNode.x, selfNode.y);
+        ctx.lineTo(n.x, n.y);
+        ctx.stroke();
+        ctx.restore();
+      });
+    }
+
+    /* nodes */
+    nodes.forEach(function(n){
+      var isHover = n.id === hoverId;
+      var pAlpha  = (0.07 + Math.sin(n.pulse) * 0.04).toFixed(2);
+      var pr      = n.r + 7 + Math.sin(n.pulse) * 3;
+
+      /* pulse ring */
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, pr, 0, 2*Math.PI);
+      ctx.strokeStyle = isHover
+        ? 'rgba(255,255,255,0.20)' : 'rgba(255,255,255,' + pAlpha + ')';
+      ctx.lineWidth = isHover ? 2 : 1.5;
+      ctx.stroke();
+
+      /* hover halo */
+      if (isHover) {
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, n.r + 13, 0, 2*Math.PI);
+        ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+        ctx.lineWidth   = 4;
+        ctx.stroke();
+      }
+
+      /* filled circle */
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, n.r, 0, 2*Math.PI);
+      ctx.fillStyle   = n.isSelf ? '#ffffff' : '#0d0d0d';
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth   = n.isSelf ? 0 : 1.5;
+      ctx.stroke();
+
+      /* labels */
+      var nick  = nickMap[n.id] || null;
+      var short = n.id.substring(0, 8);
+
+      if (nick) {
+        ctx.font = 'bold 12px ' + FONT;
+        ctx.textAlign    = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillStyle    = C_LABEL;
+        ctx.fillText(nick, n.x, n.y - n.r - 5);
+
+        ctx.font = '9px ' + FONT;
+        ctx.textBaseline = 'top';
+        ctx.fillStyle    = C_SUB;
+        ctx.fillText(short, n.x, n.y + n.r + 4);
+      } else {
+        ctx.font = 'bold 11px ' + FONT;
+        ctx.textAlign    = 'center';
+        ctx.textBaseline = 'top';
+        ctx.fillStyle    = C_LABEL;
+        ctx.fillText(short, n.x, n.y + n.r + 4);
+      }
+
+      /* ME inside self circle */
+      if (n.isSelf) {
+        ctx.font = 'bold 10px ' + FONT;
+        ctx.textAlign    = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle    = '#000';
+        ctx.fillText('ME', n.x, n.y);
+      }
+    });
+
+    /* no peers hint */
+    if (peers.length === 0 && selfId) {
+      ctx.font = '13px ' + FONT;
+      ctx.textAlign    = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle    = 'rgba(255,255,255,0.16)';
+      ctx.fillText('No peers detected', W/2, H/2 + 55);
+    }
+  }
+
+  function animate() { draw(); requestAnimationFrame(animate); }
+
+  /* ── Hover / tooltip ────────────────────────────────────────────────── */
+  function hitTest(mx, my) {
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      var dx = mx - n.x, dy = my - n.y;
+      if (Math.sqrt(dx*dx + dy*dy) < n.r + 8) return n;
+    }
+    return null;
+  }
+
+  cvs.addEventListener('mousemove', function(e) {
+    var rect = cvs.getBoundingClientRect();
+    var hit  = hitTest(e.clientX - rect.left, e.clientY - rect.top);
+    if (hit) {
+      hoverId = hit.id;
+      var nick  = nickMap[hit.id];
+      var label = nick
+        ? nick + '  ·  ' + hit.id.substring(0,8)
+        : hit.id.substring(0,8);
+      if (hit.isSelf) label = 'You  ·  ' + label;
+      tooltip.textContent = label;
+      tooltip.style.left  = (e.clientX - rect.left + 14) + 'px';
+      tooltip.style.top   = (e.clientY - rect.top  - 18) + 'px';
+      tooltip.classList.add('show');
+    } else {
+      hoverId = null;
+      tooltip.classList.remove('show');
+    }
+  });
+  cvs.addEventListener('mouseleave', function(){
+    hoverId = null; tooltip.classList.remove('show');
+  });
+
+  /* ── Sidebar ────────────────────────────────────────────────────────── */
+  function isSidebarFocused() {
+    var el = document.activeElement;
+    return el && el.classList && el.classList.contains('nick-input');
+  }
+
+  function buildSidebar(d) {
+    if (isSidebarFocused()) return;
+    var list = document.getElementById('node-list');
+    list.innerHTML = '';
+
+    var all = [{ id: d.nodeId, isSelf: true }].concat(
+      (d.peers || []).map(function(id){ return { id: id, isSelf: false }; })
+    );
+
+    all.forEach(function(node) {
+      var card = document.createElement('div');
+      card.className = 'node-card' + (node.isSelf ? ' is-self' : '');
+
+      var top = document.createElement('div');
+      top.className = 'card-top';
+
+      var dot = document.createElement('div');
+      dot.className = 'node-dot ' + (node.isSelf ? 'dot-self' : 'dot-peer');
+      top.appendChild(dot);
+
+      var nick = nickMap[node.id];
+
+      var nd = document.createElement('div');
+      nd.className   = 'node-nick';
+      nd.textContent = nick || (node.isSelf ? 'You' : node.id.substring(0,8));
+      top.appendChild(nd);
+
+      if (node.isSelf) {
+        var badge = document.createElement('span');
+        badge.className   = 'self-tag';
+        badge.textContent = 'YOU';
+        top.appendChild(badge);
+      }
+      card.appendChild(top);
+
+      var sid = document.createElement('div');
+      sid.className   = 'node-id';
+      sid.textContent = node.id.substring(0,12);
+      card.appendChild(sid);
+
+      /* nickname edit */
+      var row = document.createElement('div');
+      row.className = 'nick-row';
+
+      var inp = document.createElement('input');
+      inp.type        = 'text';
+      inp.className   = 'nick-input';
+      inp.maxLength   = 20;
+      inp.value       = nick || '';
+      inp.placeholder = 'Rename…';
+      inp.setAttribute('autocomplete',   'off');
+      inp.setAttribute('autocorrect',    'off');
+      inp.setAttribute('autocapitalize', 'off');
+      inp.setAttribute('spellcheck',     'false');
+
+      var btn = document.createElement('button');
+      btn.className   = 'nick-save';
+      btn.textContent = 'Save';
+
+      var nodeId = node.id;
+      function doSave() {
+        var v = inp.value.trim();
+        if (!v) return;
+        fetch('/setnick?id=' + encodeURIComponent(nodeId)
+            + '&nick=' + encodeURIComponent(v))
+          .then(function(){ inp.blur(); }).catch(function(){});
+      }
+      btn.addEventListener('click', doSave);
+      inp.addEventListener('keydown', function(e){
+        if (e.key === 'Enter') { e.preventDefault(); doSave(); }
+      });
+      inp.addEventListener('pointerdown', function(e){ e.stopPropagation(); });
+
+      row.appendChild(inp);
+      row.appendChild(btn);
+      card.appendChild(row);
+      list.appendChild(card);
+    });
+  }
+
+  /* ── Data poll ──────────────────────────────────────────────────────── */
+  function update() {
+    fetch('/data').then(function(r){ return r.json(); }).then(function(d) {
+      lastData = d;
+      selfId   = d.nodeId;
+      peers    = d.peers || [];
+
+      nickMap = {};
+      (d.nicknames || []).forEach(function(n){ nickMap[n.id] = n.nick; });
+
+      var selfNick = nickMap[d.nodeId] || d.nodeId.substring(0,8);
+      document.getElementById('hSelf').textContent  = selfNick;
+      document.getElementById('hCount').textContent = d.nodeCount;
+
+      syncNodes();
+      buildSidebar(d);
+    }).catch(function(){});
+  }
+
+  /* ── Boot ───────────────────────────────────────────────────────────── */
+  resize();
+  animate();
+  update();
+  setInterval(update, 1500);
+})();
+</script>
+</body>
+</html>

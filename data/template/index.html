@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mesh Chat</title>
+<link rel="stylesheet" href="/style/index.css">
+</head>
+<body>
+<div class="container">
+  <h1>Mesh Chat</h1>
+  <div class="info">
+    <span>Node: <b id="nodeId">—</b></span>
+    <span>Peers: <b id="nodeCount">0</b></span>
+  </div>
+  <div class="chat" id="chat"></div>
+  <div class="input-row">
+    <input id="msg" type="text" placeholder="Type message…" maxlength="200"
+           autocomplete="off" autocorrect="off" spellcheck="false"
+           onkeydown="if(event.key==='Enter')send()">
+    <button onclick="send()">Send</button>
+  </div>
+  <nav class="nav">
+    <a href="/nodes">Nodes</a>
+    <a href="/update">Update</a>
+  </nav>
+</div>
+
+<script>
+(function () {
+  var COLORS = [
+    '#4fc3f7','#ce93d8','#ffb74d','#ef9a9a',
+    '#80cbc4','#fff176','#f48fb1','#a5d6a7',
+    '#ff8a65','#90caf9'
+  ];
+  var colorMap  = {};
+  var nickMap   = {};
+  var nextColor = 0;
+  var rendered  = 0;
+  var box       = document.getElementById('chat');
+
+  function colorFor(id) {
+    if (!colorMap[id]) colorMap[id] = COLORS[nextColor++ % COLORS.length];
+    return colorMap[id];
+  }
+  function displayName(id) { return nickMap[id] || id.substring(0,6); }
+  function isNearBottom() {
+    return box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+  }
+
+  function send() {
+    var inp = document.getElementById('msg');
+    var t = inp.value.trim();
+    if (!t) return;
+    fetch('/send?msg=' + encodeURIComponent(t)).catch(function(){});
+    inp.value = '';
+    inp.focus();
+  }
+  window.send = send;
+
+  function update() {
+    fetch('/data').then(function(r){ return r.json(); }).then(function(d) {
+      nickMap = {};
+      (d.nicknames || []).forEach(function(n){ nickMap[n.id] = n.nick; });
+
+      var selfNick = nickMap[d.nodeId] || d.nodeId.substring(0,6);
+      document.getElementById('nodeId').textContent    = selfNick;
+      document.getElementById('nodeCount').textContent = d.nodeCount;
+
+      var msgs = d.messages || [];
+      if (msgs.length <= rendered) return;
+
+      var wasNear = isNearBottom();
+
+      for (var i = rendered; i < msgs.length; i++) {
+        var m   = msgs[i];
+        var div = document.createElement('div');
+        div.className = 'msg ' + (m.me ? 'me' : 'other');
+
+        if (m.me) {
+          if (m.dm) {
+            var b = document.createElement('span');
+            b.className   = 'dm-badge';
+            b.textContent = 'DM';
+            div.appendChild(b);
+          }
+          div.appendChild(document.createTextNode(m.text));
+        } else {
+          div.style.borderColor = colorFor(m.sender);
+          if (m.dm) {
+            var b = document.createElement('span');
+            b.className   = 'dm-badge';
+            b.textContent = 'DM';
+            div.appendChild(b);
+          }
+          div.appendChild(document.createTextNode(
+            displayName(m.sender) + ': ' + m.text));
+        }
+        box.appendChild(div);
+      }
+
+      rendered = msgs.length;
+      if (wasNear) box.scrollTop = box.scrollHeight;
+    }).catch(function(){});
+  }
+
+  setInterval(update, 1000);
+  update();
+})();
+</script>
+</body>
+</html>

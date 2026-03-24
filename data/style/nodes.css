@@ -1,0 +1,226 @@
+/* ── Mesh Nodes — nodes.css ─────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+  color: #fff;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+}
+
+/* ── Header ────────────────────────────────────────────────────────────── */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  flex-shrink: 0;
+}
+h1 { font-size: 22px; }
+.info {
+  display: flex;
+  gap: 14px;
+  font-size: 12px;
+  opacity: 0.5;
+  letter-spacing: 0.04em;
+}
+.info b { color: #fff; }
+
+/* ── Main row: graph + sidebar ─────────────────────────────────────────── */
+.main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 14px;
+}
+
+/* ── Canvas graph ──────────────────────────────────────────────────────── */
+.graph-wrap {
+  flex: 1;
+  min-width: 0;
+  border-radius: 16px;
+  outline: 1px solid #1e1e1e;
+  overflow: hidden;
+  position: relative;
+  background: #000;
+}
+canvas { display: block; width: 100%; height: 100%; }
+
+#tooltip {
+  position: absolute;
+  background: #fff;
+  color: #000;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 11px;
+  border-radius: 8px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s;
+  white-space: nowrap;
+  z-index: 10;
+}
+#tooltip.show { opacity: 1; }
+
+/* ── Sidebar ───────────────────────────────────────────────────────────── */
+.sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+}
+.sidebar::-webkit-scrollbar       { width: 3px; }
+.sidebar::-webkit-scrollbar-thumb { background: #222; border-radius: 2px; }
+
+.sidebar-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  opacity: 0.35;
+  flex-shrink: 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #1a1a1a;
+}
+
+/* ── Node card ─────────────────────────────────────────────────────────── */
+.node-card {
+  border: 1px solid #1a1a1a;
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  flex-shrink: 0;
+  transition: border-color 0.15s;
+}
+.node-card:hover   { border-color: #3a3a3a; }
+.node-card.is-self { border-color: #fff; }
+
+.card-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.node-dot {
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.dot-self { background: #fff; }
+.dot-peer { background: transparent; border: 2px solid #555; }
+
+.node-nick {
+  font-size: 13px;
+  font-weight: 600;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.node-id {
+  font-size: 11px;
+  opacity: 0.38;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+}
+.self-tag {
+  margin-left: auto;
+  font-size: 10px;
+  background: #fff;
+  color: #000;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+
+/* ── Nick edit row ─────────────────────────────────────────────────────── */
+.nick-row { display: flex; gap: 6px; }
+
+.nick-input {
+  flex: 1;
+  min-width: 0;
+  background: #0a0a0a;
+  border: 1px solid #222;
+  border-radius: 8px;
+  color: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  padding: 7px 10px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.nick-input:focus       { border-color: #666; }
+.nick-input::placeholder { color: #333; }
+
+.nick-save {
+  background: #fff;
+  color: #000;
+  border: none;
+  border-radius: 8px;
+  padding: 7px 11px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+}
+.nick-save:hover  { opacity: 0.8; }
+.nick-save:active { opacity: 0.5; }
+
+/* ── Nav ───────────────────────────────────────────────────────────────── */
+.nav {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 10px;
+  flex-shrink: 0;
+}
+.nav a {
+  color: #fff;
+  opacity: 0.35;
+  font-size: 12px;
+  text-decoration: none;
+  letter-spacing: 0.06em;
+  transition: opacity 0.15s;
+}
+.nav a:hover { opacity: 0.85; }
+
+/* ── Mobile ─────────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  html, body { height: auto; overflow-y: auto; overflow-x: hidden; }
+  body { padding: 0; }
+
+  .header {
+    padding: 14px 16px 10px;
+    margin-bottom: 0;
+    border-bottom: 1px solid #141414;
+  }
+
+  .main { flex-direction: column; flex: none; height: auto; gap: 0; }
+
+  .graph-wrap {
+    width: 100vw;
+    height: 100vw;
+    border-radius: 0;
+    outline: none;
+    border-bottom: 1px solid #141414;
+    flex-shrink: 0;
+  }
+
+  .sidebar { width: 100%; overflow-y: visible; padding: 14px 16px 20px; }
+
+  .nav { padding-bottom: 16px; }
+}
