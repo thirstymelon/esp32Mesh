@@ -86,12 +86,30 @@ static bool isDuplicate(const String& msg) {
     return false;
 }
 
-static void pushMessage(const String& sender, const String& text,
-                        bool isMe, bool isDM = false) {
-    if (chatCount < MAX_MESSAGES) chatCount++;
-    for (int i = chatCount - 1; i > 0; i--) chat[i] = chat[i - 1];
-    chat[0] = { sender, text, isMe, isDM,
-                (uint32_t)(mesh.getNodeTime() / 1000ULL) };
+static void pushMessage(const String& sender,
+                        const String& text,
+                        bool isMe,
+                        bool isDM = false) {
+
+    if (chatCount < MAX_MESSAGES) {
+        chat[chatCount++] = {
+            sender,
+            text,
+            isMe,
+            isDM,
+            (uint32_t)(mesh.getNodeTime() / 1000ULL)
+        };
+
+    } else {
+        for (int i = 1; i < MAX_MESSAGES; i++) { chat[i - 1] = chat[i]; }
+        chat[MAX_MESSAGES - 1] = {
+            sender,
+            text,
+            isMe,
+            isDM,
+            (uint32_t)(mesh.getNodeTime() / 1000ULL)
+        };
+    }
 }
 
 static String escapeJSON(const String& s) {
@@ -120,6 +138,19 @@ static String getNick(uint32_t id) {
     for (int i = 0; i < nickCount; i++)
         if (nickDb[i].id == id) return nickDb[i].nick;
     return autoNick(id);
+}
+
+static void syncAllNicknames() {
+    for (int i = 0; i < nickCount; i++) {
+        String pkt =
+            String(NICK_SYNC_PFX) +
+            String(nickDb[i].id) +
+            "|" +
+            nickDb[i].nick;
+
+        mesh.sendBroadcast(pkt);
+        delay(10);
+    }
 }
 
 static void storeNick(uint32_t id, const String& nick) {
@@ -367,7 +398,7 @@ void receivedCallback(uint32_t from, String& msg) {
 void newConnectionCallback(uint32_t nodeId) {
     Serial.printf("[MESH] +Node %u  peers=%d\n",
                   nodeId, (int)mesh.getNodeList().size());
-    broadcastNick();
+    syncAllNicknames();
     oLastDraw = 0;
 }
 
@@ -523,7 +554,7 @@ void setup() {
         // Messages (oldest → newest so browser can append)
         j += "\"messages\":[";
         bool fm = true;
-        for (int i = chatCount - 1; i >= 0; i--) {
+        for (int i = 0; i < chatCount; i++) {
             if (!fm) j += ",";
             j += "{\"sender\":\"" + escapeJSON(chat[i].sender) + "\","
                + "\"text\":\""    + escapeJSON(chat[i].text)   + "\","

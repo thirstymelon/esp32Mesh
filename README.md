@@ -1,83 +1,183 @@
-# ⚡ ESP32 Mesh Chat — OTA + OLED + Zero-Infra Network
+# ⚡ MeshOS — Distributed ESP32 Mesh Chat + OTA System
 
 <p align="center">
-  <b>A fully self-organizing mesh chat system with OTA firmware distribution</b><br>
-  No router 🚫 • No internet 🌐❌ • No server 🖥️❌ • Just ESP32 swarm energy 🐝⚡
+  <img src="https://img.shields.io/badge/ESP32-Mesh-111111?style=for-the-badge&logo=espressif&logoColor=white">
+  <img src="https://img.shields.io/badge/OTA-Distributed-00C853?style=for-the-badge">
+  <img src="https://img.shields.io/badge/OLED-UI-FF6D00?style=for-the-badge">
+  <img src="https://img.shields.io/badge/PlatformIO-Build-6A1B9A?style=for-the-badge&logo=platformio&logoColor=white">
+  <img src="https://img.shields.io/badge/macOS-Desktop_App-000000?style=for-the-badge&logo=apple&logoColor=white">
+  <img src="https://img.shields.io/badge/License-MIT-161616?style=for-the-badge">
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/ESP32-Mesh-0A0A0A?style=flat-square&logo=espressif&logoColor=white">
-  <img src="https://img.shields.io/badge/OTA-MultiNode-00C853?style=flat-square">
-  <img src="https://img.shields.io/badge/OLED-UI-FF6D00?style=flat-square">
-  <img src="https://img.shields.io/badge/PlatformIO-Build-6A1B9A?style=flat-square&logo=platformio&logoColor=white">
-  <img src="https://img.shields.io/badge/License-MIT-111111?style=flat-square">
+  <b>A fully self-organizing ESP32 mesh communication platform with distributed OTA firmware updates, OLED telemetry, and a native macOS control application.</b>
 </p>
 
 ---
 
-## 🎥 Demo (aka "this feels illegal but works")
+# ✨ Overview
 
-Flash 3–5 ESP32s.
+MeshOS is a distributed communication system built entirely on ESP32 nodes.
 
-They instantly:
-- find each other 🤝
-- build a network 🧠
-- sync time ⏱️
-- start chatting 💬
+No router.  
+No internet.  
+No central server.
 
-Now hit **OTA → Entire Mesh**…
+Each ESP32 dynamically becomes:
+- a client
+- a router
+- a relay node
+- an OTA distributor
 
-💥 Every node updates itself like a distributed organism.
-
----
-
-## 🚀 Features (why this is not a basic project)
-
-### 🧠 Core Mesh System
-
-- ⚡ **Zero infra** → no router needed
-- 🔁 **Multi-hop routing** → distance = number of nodes
-- 🛑 **Deduplication engine** → no loops, no spam
-- ⏱️ **Mesh-synced time** → all nodes share one clock
-- 🏷️ **Auto + custom nicknames** → globally synced
+The system automatically forms a resilient multi-hop mesh network capable of:
+- real-time messaging
+- topology synchronization
+- distributed firmware propagation
+- live telemetry visualization
+- decentralized communication
 
 ---
 
-### 🌐 Web Interface
+# 🖥️ Native macOS Application
 
-- 💬 Real-time chat UI
-- 🎨 Color-coded nodes (instant visual clarity)
-- 📡 `/nodes` → animated topology graph
-- 📱 Mobile-first, smooth AF
+MeshOS includes a dedicated native macOS desktop application for:
+- network monitoring
+- firmware management
+- OTA distribution
+- node visualization
+- live mesh diagnostics
+
+## Features
+
+- Native Apple Silicon support
+- Lightweight standalone `.app`
+- Local-first architecture
+- No cloud dependency
+- Zero telemetry
+
+## Installation
+
+Download the latest release from:
+
+```txt
+GitHub → Releases
+```
+
+Extract:
+
+```txt
+MeshOS-macOS.zip
+```
+
+Move:
+
+```txt
+MeshOS.app → /Applications
+```
+
+Then:
+- Right click the app
+- Select **Open**
+- Confirm the security dialog
+
+> The app is currently distributed without Apple notarization.
 
 ---
 
-### 🖥️ OLED UI (meshOS)
+# 🚀 Core Features
 
-- 🔵 Live connection state
-- 📊 Peer count + uptime + signal
-- 💬 Message preview system
-- ⚡ Fully non-blocking animations (no lag, no delay())
+## 🌐 Self-Organizing Mesh Networking
 
----
-
-## ⚡ OTA (THIS IS THE CRAZY PART)
-
-This is where your project stops being “ESP32 project”
-and becomes **distributed system engineering**
+- Zero infrastructure deployment
+- Multi-hop packet routing
+- Dynamic peer discovery
+- Self-healing topology
+- Broadcast synchronization
+- Automatic reconnection
 
 ---
 
-### 🔥 Modes
+## ⚡ Distributed OTA Firmware Updates
 
-| Mode | What happens |
-|------|------------|
-| 🟢 This Node | normal OTA |
-| 🌐 Entire Mesh | ONE upload → ALL nodes update |
+Upload firmware once.
+
+Entire mesh updates itself autonomously.
+
+### OTA Modes
+
+| Mode | Description |
+|---|---|
+| This Node | Standard local OTA |
+| Entire Mesh | Distributed firmware propagation |
+
+### OTA Capabilities
+
+- Chunk-based transport
+- MD5 integrity verification
+- Multi-node synchronization
+- Non-blocking update engine
+- Live OTA progress tracking
+- Automatic reboot coordination
 
 ---
 
-## 🧠 OTA Protocol (actual system design)
+## 🖥️ OLED Mesh Interface
+
+Each node includes a fully animated OLED telemetry interface.
+
+### OLED Features
+
+- Connection status
+- Peer count
+- Mesh uptime
+- Live message preview
+- Signal visualization
+- Non-blocking animations
+
+---
+
+## 🌍 Web Dashboard
+
+Built-in asynchronous web interface accessible directly from any node.
+
+### Dashboard Features
+
+- Real-time chat UI
+- Node topology graph
+- Live system JSON API
+- OTA upload panel
+- Mobile-friendly interface
+
+---
+
+# 🧠 System Architecture
+
+```txt
+                ┌─────────────────┐
+                │  Browser / App    │
+                └────────┬────────┘
+                         │
+                ┌────────▼────────┐
+                │ Async Web Layer │
+                └────────┬────────┘
+                         │
+          ┌──────────────▼──────────────┐
+          │       MeshOS Engine            │
+          │  Routing • Sync • Messaging    │
+          └──────────────┬──────────────┘
+                         │
+          ┌──────────────▼──────────────┐
+          │ Distributed OTA Subsystem      │
+          └──────────────┬──────────────┘
+                         │
+                 ┌───────▼───────┐
+                 │ ESP32 Nodes     │
+                 └───────────────┘
+```
+
+---
+
+# ⚡ OTA Protocol
 
 ```txt
 __OTA__|ANNOUNCE|size|md5|chunks
@@ -88,52 +188,17 @@ __OTA__|ACK|nodeId
 
 ---
 
-## ⚙️ Internal Flow (what is happening under the hood)
-
-1. User uploads `.bin` → `/update`
-2. Firmware saved → **LittleFS**
-3. Sender broadcasts:
-   - ANNOUNCE
-   - CHUNKs (512B)
-   - END
-4. All nodes:
-   - Start OTA mode
-   - Receive chunks
-   - Decode base64
-   - Write to flash
-   - Verify MD5
-   - Send ACK
-   - Reboot
-
-Meanwhile:
-👉 Mesh keeps running
-👉 UI keeps updating
-👉 System never blocks
-
----
-
-## 💡 Why This Is Actually Powerful
-
-- 📡 Works **offline**
-- 🔁 Self-healing distribution
-- 🧩 Chunk-based OTA (safe AF)
-- 🔐 MD5 integrity check
-- 📊 `/ota/status` → live progress tracking
-- ⚙️ Fully async (no blocking hell)
-
----
-
-## 🧰 Hardware
+# 🔧 Hardware Requirements
 
 | Component | Notes |
-|----------|------|
-| ESP32 | any board |
-| OLED SSD1306 | 128×64 I²C |
-| Wires | 4 only |
+|---|---|
+| ESP32 | Any compatible board |
+| SSD1306 OLED | 128×64 I²C |
+| Jumper Wires | 4-wire setup |
 
 ---
 
-## 🔌 Wiring
+# 🔌 OLED Wiring
 
 ```txt
 OLED VCC → 3.3V
@@ -144,156 +209,193 @@ OLED SCL → GPIO 22
 
 ---
 
-## 🧠 Software Stack
+# 🧰 Software Stack
 
-- painlessMesh (mesh brain 🧠)
-- ESPAsyncWebServer (non-blocking web)
-- AsyncTCP (network core)
-- U8g2 (OLED rendering)
-- PlatformIO (build system)
+| Technology | Purpose |
+|---|---|
+| painlessMesh | Mesh networking |
+| ESPAsyncWebServer | Async web server |
+| AsyncTCP | TCP networking |
+| U8g2 | OLED rendering |
+| LittleFS | Filesystem |
+| PlatformIO | Build system |
 
 ---
 
-## 📁 Project Structure
+# 📁 Project Structure
 
 ```txt
-esp32Mesh/
+MeshOS/
 ├── data/
-│   ├── html_gz/      # compressed UI ⚡
-│   ├── style/        # CSS
-│   ├── template/     # HTML
-├── src/
-│   ├── main.cpp      # mesh + UI + logic
-│   └── ota.cpp       # OTA engine 🔥
+│   ├── html_gz/
+│   ├── style/
+│   └── template/
 ├── include/
 │   ├── ota.h
 │   └── secrets.example.h
+├── src/
+│   ├── main.cpp
+│   ├── ota.cpp
+│   └── ui/
+├── desktop/
+│   └── MeshOS.app
+├── build.sh
+└── platformio.ini
 ```
 
 ---
 
-## 🚀 Getting Started
+# 🚀 Getting Started
 
-### 1. Clone
+## 1. Clone Repository
 
 ```bash
-git clone https://github.com/your-username/esp32Mesh.git
-cd esp32Mesh
+git clone https://github.com/your-username/MeshOS.git
+cd MeshOS
 ```
 
 ---
 
-### 2. Build & Upload
+## 2. Configure Mesh
+
+Create:
+
+```txt
+include/secrets.h
+```
+
+Example:
+
+```cpp
+#define MESH_PREFIX   "MESH_NAME"
+#define MESH_PASSWORD "MESH_PASS"
+#define MESH_CHANNEL  6
+
+#define OTA_USER      "admin"
+#define OTA_PASS      "password"
+```
+
+---
+
+## 3. Build Firmware
 
 ```bash
 chmod +x build.sh
 ./build.sh
+```
 
+---
+
+## 4. Flash ESP32
+
+```bash
 pio run -t upload
 pio run -t uploadfs
 ```
 
 ---
 
-### 3. Connect
+## 5. Connect to Mesh
 
-```
-http://192.168.4.1 (Router IP)
-```
-
----
-
-## ⚙️ Config
-
-```cpp
-#define MESH_PREFIX   "MESH_NAME"
-#define MESH_PASSWORD "MESH_PASS"
-#define MESH_CHANNEL  6
-```
-
----
-
-## 🌐 Endpoints
-
-| Endpoint | Use |
-|----------|----|
-| `/` | Chat UI |
-| `/nodes` | Graph UI |
-| `/update` | OTA |
-| `/ota/status` | OTA progress |
-| `/send` | Send msg |
-| `/data` | Full system JSON |
-
----
-
-## 🧠 Architecture (clean mental model)
+Open:
 
 ```txt
-          📱 Browser
-              │
-        ┌─────▼─────┐
-        │ Web Server │
-        └─────┬─────┘
-              │
-     ┌────────▼────────┐
-     │   Mesh Engine   │◄────────► ESP32 Nodes
-     └────────┬────────┘
-              │
-     ┌────────▼────────┐
-     │   OTA Engine    │🔥
-     └────────┬────────┘
-              │
-         ┌────▼────┐
-         │  OLED   │
-         └─────────┘
+http://192.168.4.1
 ```
 
 ---
 
-## 🧠 How It Actually Works
+# 🌐 API Endpoints
 
-- Mesh runs on WiFi AP + STA simultaneously
-- Each node = router + client
-- Messages = broadcast packets
-- Deduplication = hash ring buffer
-- Nicknames = synced via special packets
-- OTA = chunked distributed update system
-
-👉 You basically built a **mini distributed network stack**
-
----
-
-## ⚠️ Limitations
-
-- No persistence (RAM only)
-- No encryption (yet 😏)
-- OTA slower on big meshes
-- Shared WiFi channel
+| Endpoint | Description |
+|---|---|
+| `/` | Main chat UI |
+| `/nodes` | Network topology |
+| `/update` | OTA upload |
+| `/ota/status` | OTA progress |
+| `/send` | Send messages |
+| `/data` | System JSON |
 
 ---
 
-## 🧠 Future Ideas
+# 🧠 Internal Design Highlights
 
-- 🔐 End-to-end encryption
-- 📦 Message persistence
-- 🧠 AI assistant nodes
-- 📡 LoRa hybrid mesh
-- 🔊 Morse messaging
-
----
-
-## ⭐ Why This Hits Different
-
-- Not just ESP32
-- Not just mesh
-- Not just OTA
-
-👉 This is **distributed systems on embedded hardware**
+- Fully asynchronous architecture
+- Non-blocking OTA distribution
+- Deduplicated mesh packet relay
+- Hash-based message filtering
+- Mesh-wide nickname synchronization
+- Simultaneous AP + STA operation
+- Distributed firmware replication
 
 ---
 
-## 📜 License
+# ⚠️ Current Limitations
+
+- No persistent storage
+- No encryption layer yet
+- OTA throughput decreases on large meshes
+- Shared WiFi channel constraints
+
+---
+
+# 🔮 Future Roadmap
+
+- End-to-end encryption
+- Persistent message storage
+- AI-powered mesh assistant nodes
+- LoRa hybrid transport
+- Voice communication
+- Morse-code messaging support
+- Native Linux + Windows desktop apps
+
+---
+
+# 📸 Screenshots
+
+```txt
+Add:
+- Web UI screenshots
+- OLED interface photos
+- Mesh topology graph
+- macOS application screenshots
+```
+
+---
+
+# 🧪 Why This Project Matters
+
+MeshOS is not a basic ESP32 demo.
+
+It combines:
+- distributed systems
+- embedded networking
+- OTA orchestration
+- asynchronous communication
+- decentralized topology management
+
+into a fully functioning embedded mesh platform.
+
+This project explores how resilient communication systems can be built without relying on centralized infrastructure.
+
+---
+
+# 📜 License
 
 MIT License
 
 ---
+
+# ⭐ Support The Project
+
+If you found this project interesting:
+- Star the repository
+- Share it
+- Contribute ideas
+- Build your own mesh network
+
+---
+
+<p align="center">
+  <b>MeshOS — Distributed systems engineering on embedded hardware.</b>
+</p>
