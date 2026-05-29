@@ -1,204 +1,156 @@
-# ⚡ MeshOS — Distributed ESP32 Mesh Chat + OTA System
+# ⚡ MeshOS — Distributed ESP32 Mesh Communication Platform
 
 <p align="center">
   <img src="https://img.shields.io/badge/ESP32-Mesh-111111?style=for-the-badge&logo=espressif&logoColor=white">
   <img src="https://img.shields.io/badge/OTA-Distributed-00C853?style=for-the-badge">
   <img src="https://img.shields.io/badge/OLED-UI-FF6D00?style=for-the-badge">
-  <img src="https://img.shields.io/badge/PlatformIO-Build-6A1B9A?style=for-the-badge&logo=platformio&logoColor=white">
-  <img src="https://img.shields.io/badge/macOS-Desktop_App-000000?style=for-the-badge&logo=apple&logoColor=white">
-  <img src="https://img.shields.io/badge/License-MIT-161616?style=for-the-badge">
+  <img src="https://img.shields.io/badge/PlatformIO-Firmware-6A1B9A?style=for-the-badge&logo=platformio&logoColor=white">
+  <img src="https://img.shields.io/badge/SwiftUI-macOS_App-000000?style=for-the-badge&logo=apple&logoColor=white">
 </p>
 
-<p align="center">
-  <b>A fully self-organizing ESP32 mesh communication platform with distributed OTA firmware updates, OLED telemetry, and a native macOS control application.</b>
-</p>
+## Overview
 
----
+MeshOS is a decentralized ESP32 mesh communication project that combines:
 
-# ✨ Overview
+- ESP32 firmware with painlessMesh peer-to-peer networking
+- An embedded web dashboard served from each node
+- Distributed over-the-air (OTA) updates across the mesh
+- A native macOS SwiftUI application for monitoring and control
 
-MeshOS is a distributed communication system built entirely on ESP32 nodes.
+This repository is split into two main pieces:
 
-No router.  
-No internet.  
-No central server.
+- `firmware/` — ESP32 firmware, web UI assets, OTA logic, OLED status display
+- `macos/MeshOSApp/` — native macOS client written in SwiftUI
 
-Each ESP32 dynamically becomes:
-- a client
-- a router
-- a relay node
-- an OTA distributor
+## Key Features
 
-The system automatically forms a resilient multi-hop mesh network capable of:
-- real-time messaging
-- topology synchronization
-- distributed firmware propagation
-- live telemetry visualization
-- decentralized communication
+- Self-forming, multi-hop ESP32 mesh network
+- Peer discovery, routing, and broadcast message propagation
+- Local web dashboard on each node
+- Distributed mesh OTA updates with chunked delivery and MD5 verification
+- OLED status display with connection, node, and message feedback
+- Native macOS control app for connection, monitoring, and diagnostics
+- No central server required
+- No internet dependency
 
----
+## Repository Structure
 
-# 🖥️ Native macOS Application
+- `firmware/`
+  - `platformio.ini` — ESP32 build configuration
+  - `src/main.cpp` — mesh logic, web server, OLED UI
+  - `src/ota.cpp` — OTA upload, broadcast distribution, flashing
+  - `include/secrets.example.h` — mesh and OTA credentials
+  - `data/` — dashboard HTML/CSS assets
+  - `build.sh` — compress web UI assets for LittleFS
+- `macos/MeshOSApp/`
+  - `MeshOSApp.swift` — app entry point
+  - `MeshManager.swift` — HTTP polling and JSON decoding
+  - `ContentView.swift` — main UI and navigation
+  - `Views/` — app screens and supporting views
 
-MeshOS includes a dedicated native macOS desktop application for:
-- network monitoring
-- firmware management
-- OTA distribution
-- node visualization
-- live mesh diagnostics
+## Firmware Details
 
-## Features
+The ESP32 firmware uses:
 
-- Native Apple Silicon support
-- Lightweight standalone `.app`
-- Local-first architecture
-- No cloud dependency
-- Zero telemetry
+- `painlessMesh` for mesh networking
+- `ESPAsyncWebServer` for the local dashboard and OTA endpoints
+- `LittleFS` for storing web assets and OTA binaries
+- `U8g2` and `Adafruit SSD1306` for the OLED display
+- `ArduinoJson` for structured data handling
 
-## Installation
+### Default mesh settings
 
-Download the latest release from:
+Defined in `firmware/include/secrets.example.h`:
 
-```txt
-GitHub → Releases
+- `MESH_PREFIX = "ESP32Mesh"`
+- `MESH_PASSWORD = "meshpass123"`
+- `MESH_PORT = 50003`
+- `MESH_CHANNEL = 6`
+- `OTA_USER = "admin"`
+- `OTA_PASS = "password"`
+
+## macOS App Details
+
+The macOS app connects to a node's HTTP dashboard and polls the `/data` API.
+
+It displays:
+
+- Connected node status
+- Active peer count
+- Mesh topology and peers
+- Recent chat messages
+- Device nickname
+- Connection and refresh controls
+
+The app is built with SwiftUI and includes a settings panel, keyboard shortcuts, and clean macOS native styling.
+
+## Web API Endpoints
+
+The firmware exposes HTTP endpoints for dashboard and control:
+
+- `GET /` — main web dashboard page
+- `GET /nodes` — node list page
+- `GET /update` — OTA upload page
+- `POST /update` — upload firmware to node or full mesh
+- `GET /ota/status` — OTA progress JSON
+- `GET /send?msg=...` — broadcast chat messages
+- `GET /setnick?id=...&nick=...` — set/update a nickname
+- `GET /data` — JSON mesh status used by the macOS app
+
+## Build and Flash Instructions
+
+### Prerequisites
+
+- PlatformIO installed (`pio` CLI)
+- `sass` (optional, for compiling SCSS)
+- `gzip` available on your system
+
+### Build the web assets
+
+From `firmware/`:
+
+```bash
+cd firmware
+chmod +x build.sh
+./build.sh
 ```
 
-Extract:
+This generates compressed HTML/CSS under `firmware/data/html_gz/` and `firmware/data/style/`.
 
-```txt
-MeshOS-macOS.zip
+### Upload firmware and filesystem
+
+1. Build and upload the ESP32 firmware:
+
+```bash
+pio run
+pio run -t upload
 ```
 
-Move:
+2. Upload the LittleFS filesystem:
 
-```txt
-MeshOS.app → /Applications
+```bash
+pio run -t uploadfs
 ```
 
-Then:
-- Right click the app
-- Select **Open**
-- Confirm the security dialog
+> If your board uses a different upload port or board target, update `platformio.ini` accordingly.
 
-> The app is currently distributed without Apple notarization.
+## Running the macOS App
 
----
+Open `macos/MeshOSApp/MeshOSApp.swift` in Xcode and run the app.
 
-# 🚀 Core Features
+Then connect to a node by entering its IP address and press Connect.
 
-## 🌐 Self-Organizing Mesh Networking
+The app polls the node's `/data` endpoint and displays live mesh state.
 
-- Zero infrastructure deployment
-- Multi-hop packet routing
-- Dynamic peer discovery
-- Self-healing topology
-- Broadcast synchronization
-- Automatic reconnection
+## Hardware Setup
 
----
+Required hardware:
 
-## ⚡ Distributed OTA Firmware Updates
+- ESP32 development board
+- SSD1306 128×64 I2C OLED display
+- Jumper wires
 
-Upload firmware once.
-
-Entire mesh updates itself autonomously.
-
-### OTA Modes
-
-| Mode | Description |
-|---|---|
-| This Node | Standard local OTA |
-| Entire Mesh | Distributed firmware propagation |
-
-### OTA Capabilities
-
-- Chunk-based transport
-- MD5 integrity verification
-- Multi-node synchronization
-- Non-blocking update engine
-- Live OTA progress tracking
-- Automatic reboot coordination
-
----
-
-## 🖥️ OLED Mesh Interface
-
-Each node includes a fully animated OLED telemetry interface.
-
-### OLED Features
-
-- Connection status
-- Peer count
-- Mesh uptime
-- Live message preview
-- Signal visualization
-- Non-blocking animations
-
----
-
-## 🌍 Web Dashboard
-
-Built-in asynchronous web interface accessible directly from any node.
-
-### Dashboard Features
-
-- Real-time chat UI
-- Node topology graph
-- Live system JSON API
-- OTA upload panel
-- Mobile-friendly interface
-
----
-
-# 🧠 System Architecture
-
-```txt
-                ┌─────────────────┐
-                │  Browser / App    │
-                └────────┬────────┘
-                         │
-                ┌────────▼────────┐
-                │ Async Web Layer │
-                └────────┬────────┘
-                         │
-          ┌──────────────▼──────────────┐
-          │       MeshOS Engine            │
-          │  Routing • Sync • Messaging    │
-          └──────────────┬──────────────┘
-                         │
-          ┌──────────────▼──────────────┐
-          │ Distributed OTA Subsystem      │
-          └──────────────┬──────────────┘
-                         │
-                 ┌───────▼───────┐
-                 │ ESP32 Nodes     │
-                 └───────────────┘
-```
-
----
-
-# ⚡ OTA Protocol
-
-```txt
-__OTA__|ANNOUNCE|size|md5|chunks
-__OTA__|CHUNK|seq|base64_data
-__OTA__|END|md5
-__OTA__|ACK|nodeId
-```
-
----
-
-# 🔧 Hardware Requirements
-
-| Component | Notes |
-|---|---|
-| ESP32 | Any compatible board |
-| SSD1306 OLED | 128×64 I²C |
-| Jumper Wires | 4-wire setup |
-
----
-
-# 🔌 OLED Wiring
+### OLED wiring
 
 ```txt
 OLED VCC → 3.3V
@@ -207,40 +159,75 @@ OLED SDA → GPIO 21
 OLED SCL → GPIO 22
 ```
 
+## Notes
+
+- `firmware/include/secrets.example.h` is a template. Copy it to `firmware/include/secrets.h` and customize credentials before flashing.
+- The distributed OTA mode saves firmware to LittleFS and then broadcasts chunks to peers.
+- The mesh uses dynamic nickname sync and peer relay to propagate messages and metadata.
+- The macOS client is local-first and does not require Apple cloud services.
+
+## Recommended Workflow
+
+1. Build the dashboard assets with `firmware/build.sh`
+2. Upload the LittleFS filesystem with `pio run -t uploadfs`
+3. Flash the firmware with `pio run -t upload`
+4. Start the macOS app in Xcode
+5. Connect to a node IP and monitor the mesh
+
 ---
 
 # 🧰 Software Stack
 
 | Technology | Purpose |
-|---|---|
+|------------|----------|
 | painlessMesh | Mesh networking |
 | ESPAsyncWebServer | Async web server |
 | AsyncTCP | TCP networking |
 | U8g2 | OLED rendering |
 | LittleFS | Filesystem |
-| PlatformIO | Build system |
+| PlatformIO | Firmware build system |
+| SwiftUI | Native macOS application |
 
 ---
 
 # 📁 Project Structure
 
 ```txt
-MeshOS/
-├── data/
-│   ├── html_gz/
-│   ├── style/
-│   └── template/
-├── include/
-│   ├── ota.h
-│   └── secrets.example.h
-├── src/
-│   ├── main.cpp
-│   ├── ota.cpp
-│   └── ui/
-├── desktop/
-│   └── MeshOS.app
-├── build.sh
-└── platformio.ini
+esp32Mesh/
+├── firmware/
+│   ├── data/
+│   │   ├── html_gz/
+│   │   ├── scss/
+│   │   ├── style/
+│   │   └── template/
+│   │
+│   ├── include/
+│   │   ├── ota.h
+│   │   └── secrets.example.h
+│   │
+│   ├── lib/
+│   ├── src/
+│   │   ├── main.cpp
+│   │   └── ota.cpp
+│   │
+│   ├── test/
+│   ├── build.sh
+│   ├── diagram.json
+│   ├── platformio.ini
+│   └── wokwi.toml
+│
+├── macos/
+│   ├── MeshOSApp/
+│   │   ├── Assets.xcassets/
+│   │   ├── Views/
+│   │   ├── ContentView.swift
+│   │   ├── MeshManager.swift
+│   │   └── MeshOSApp.swift
+│   │
+│   └── app_claude.xcodeproj/
+│
+├── README.md
+└── .gitignore
 ```
 
 ---
@@ -250,8 +237,8 @@ MeshOS/
 ## 1. Clone Repository
 
 ```bash
-git clone https://github.com/your-username/MeshOS.git
-cd MeshOS
+git clone https://github.com/thirstymelon/esp32Mesh.git
+cd esp32Mesh
 ```
 
 ---
@@ -261,7 +248,7 @@ cd MeshOS
 Create:
 
 ```txt
-include/secrets.h
+firmware/include/secrets.h
 ```
 
 Example:
@@ -280,6 +267,8 @@ Example:
 ## 3. Build Firmware
 
 ```bash
+cd firmware
+
 chmod +x build.sh
 ./build.sh
 ```
@@ -289,6 +278,8 @@ chmod +x build.sh
 ## 4. Flash ESP32
 
 ```bash
+cd firmware
+
 pio run -t upload
 pio run -t uploadfs
 ```
@@ -300,15 +291,60 @@ pio run -t uploadfs
 Open:
 
 ```txt
-http://192.168.4.1
+http://<Node IP address>
 ```
+
+---
+
+# 🖥️ Building the macOS Application
+
+Open the project:
+
+```bash
+cd macos
+
+open app_claude.xcodeproj
+```
+
+Requirements:
+
+- macOS
+- Xcode 26+
+- Apple Silicon Mac (recommended)
+
+Build:
+
+```txt
+Product → Build
+```
+
+Archive:
+
+```txt
+Product → Archive
+```
+
+Install:
+
+```txt
+MeshOS.app → /Applications
+```
+
+### Application Features
+
+- Native SwiftUI interface
+- Real-time mesh monitoring
+- Node discovery
+- OTA management
+- Network diagnostics
+- Local-first architecture
 
 ---
 
 # 🌐 API Endpoints
 
 | Endpoint | Description |
-|---|---|
+|-----------|-------------|
 | `/` | Main chat UI |
 | `/nodes` | Network topology |
 | `/update` | OTA upload |
@@ -347,34 +383,25 @@ http://192.168.4.1
 - LoRa hybrid transport
 - Voice communication
 - Morse-code messaging support
-- Native Linux + Windows desktop apps
-
----
-
-# 📸 Screenshots
-
-```txt
-Add:
-- Web UI screenshots
-- OLED interface photos
-- Mesh topology graph
-- macOS application screenshots
-```
+- Native iOS application
+- Cross-platform node management
 
 ---
 
 # 🧪 Why This Project Matters
 
-MeshOS is not a basic ESP32 demo.
+MeshOS is more than a firmware project.
 
 It combines:
-- distributed systems
-- embedded networking
-- OTA orchestration
-- asynchronous communication
-- decentralized topology management
 
-into a fully functioning embedded mesh platform.
+- Distributed systems
+- Embedded networking
+- OTA orchestration
+- Native desktop software
+- Asynchronous communication
+- Decentralized topology management
+
+into a complete communication ecosystem.
 
 This project explores how resilient communication systems can be built without relying on centralized infrastructure.
 
@@ -389,6 +416,7 @@ MIT License
 # ⭐ Support The Project
 
 If you found this project interesting:
+
 - Star the repository
 - Share it
 - Contribute ideas
