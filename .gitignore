@@ -1,7 +1,41 @@
-.pio
-.vscode/.browse.c_cpp.db*
-.vscode/c_cpp_properties.json
-.vscode/launch.json
-.vscode/ipch
+# macOS
+.DS_Store
 
-include/secrets.h
+# =========================
+# Firmware (PlatformIO)
+# =========================
+firmware/.pio/
+firmware/.vscode/
+
+# Secrets
+firmware/include/secrets.h
+
+# =========================
+# Xcode / Swift
+# =========================
+**/xcuserdata/
+**/*.xcuserstate
+**/DerivedData/
+
+# Archives
+**/*.xcarchive
+**/*.dSYM
+**/*.dSYM.zip
+
+# SwiftPM
+**/.build/
+**/.swiftpm/
+
+# =========================
+# Editors
+# =========================
+.vscode/
+.cursor/
+
+# =========================
+# Logs & Temp
+# =========================
+*.log
+*.swp
+*.swo
+*~
