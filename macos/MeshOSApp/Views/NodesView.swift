@@ -7,23 +7,25 @@ import SwiftUI
 
 struct NodesView: View {
     @EnvironmentObject var meshManager: MeshManager
-    @State private var editingNodeId: String?
-    @State private var editingNickname: String = ""
 
     var allNodes: [NodeInfo] {
         guard let data = meshManager.meshData else { return [] }
 
         var nodes: [NodeInfo] = []
         let selfNick = data.nicknames.first(where: { $0.id == data.nodeId })?.nick ?? "This Mac"
-        nodes.append(NodeInfo(id: data.nodeId, nickname: selfNick, isSelf: true, isOnline: true))
+        
+        let selfEntry = meshManager.activeNodes.first(where: { String($0.id) == data.nodeId })
+        nodes.append(NodeInfo(id: data.nodeId, nickname: selfNick, isSelf: true, isOnline: true, battery: selfEntry?.battery, uptime: selfEntry?.uptime))
 
         for peerId in data.peers {
-            let nick = data.nicknames.first(where: { $0.id == peerId })?.nick ?? autoNickname(for: peerId)
-            nodes.append(NodeInfo(id: peerId, nickname: nick, isSelf: false, isOnline: true))
+            let nick = data.nicknames.first(where: { $0.id == peerId })?.nick ?? "Node \(peerId.prefix(6))"
+            let entry = meshManager.activeNodes.first(where: { String($0.id) == peerId })
+            nodes.append(NodeInfo(id: peerId, nickname: nick, isSelf: false, isOnline: true, battery: entry?.battery, uptime: entry?.uptime))
         }
 
         for nickname in data.nicknames where !nodes.contains(where: { $0.id == nickname.id }) {
-            nodes.append(NodeInfo(id: nickname.id, nickname: nickname.nick, isSelf: false, isOnline: false))
+            let entry = meshManager.activeNodes.first(where: { String($0.id) == nickname.id })
+            nodes.append(NodeInfo(id: nickname.id, nickname: nickname.nick, isSelf: false, isOnline: false, battery: entry?.battery, uptime: entry?.uptime))
         }
 
         return nodes.sorted {
@@ -64,17 +66,7 @@ struct NodesView: View {
                 ScrollView {
                     LazyVStack(spacing: 8) {
                         ForEach(allNodes) { node in
-                            NodeRow(
-                                node: node,
-                                isEditing: editingNodeId == node.id,
-                                editingNickname: $editingNickname,
-                                onEdit: {
-                                    editingNodeId = node.id
-                                    editingNickname = node.nickname
-                                },
-                                onSave: { saveNickname(for: node) },
-                                onCancel: { editingNodeId = nil }
-                            )
+                            NodeRow(node: node)
                         }
                     }
                     .padding(14)
@@ -99,24 +91,6 @@ struct NodesView: View {
         }
         .frame(maxHeight: .infinity)
     }
-
-    private func saveNickname(for node: NodeInfo) {
-        let nickname = editingNickname.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !nickname.isEmpty else { return }
-
-        Task {
-            await meshManager.setNickname(nickname, for: node.id)
-            editingNodeId = nil
-        }
-    }
-
-    private func autoNickname(for nodeId: String) -> String {
-        let adjectives = ["Swift", "Bold", "Bright", "Dark", "Fast", "Cool", "Sharp", "Wild", "Keen", "Calm"]
-        let nouns = ["Fox", "Hawk", "Wolf", "Bear", "Lynx", "Kite", "Wren", "Crab", "Moth", "Ibis"]
-
-        guard let id = UInt32(nodeId) else { return "Unknown" }
-        return "\(adjectives[Int(id % 10)])\(nouns[Int((id >> 4) % 10)])"
-    }
 }
 
 // MARK: - Node Info Model
@@ -125,15 +99,12 @@ struct NodeInfo: Identifiable {
     let nickname: String
     let isSelf: Bool
     let isOnline: Bool
+    let battery: Int?
+    let uptime: Int64?
 }
 
 struct NodeRow: View {
     let node: NodeInfo
-    let isEditing: Bool
-    @Binding var editingNickname: String
-    let onEdit: () -> Void
-    let onSave: () -> Void
-    let onCancel: () -> Void
 
     var body: some View {
         HStack(spacing: 10) {
@@ -141,54 +112,48 @@ struct NodeRow: View {
                 .fill(NodeColor.color(for: node.id))
                 .frame(width: 10, height: 10)
 
-            if isEditing {
-                TextField("Nickname", text: $editingNickname)
-                    .textFieldStyle(.plain)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(Color.black, in: Capsule())
-                    .overlay { Capsule().strokeBorder(AppPalette.border, lineWidth: 1) }
-                    .onSubmit(onSave)
-
-                Button("Save", action: onSave)
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.white)
-                Button("Cancel", action: onCancel)
-                    .buttonStyle(.plain)
-                    .foregroundStyle(AppPalette.dimText)
-            } else {
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 6) {
-                        Text(node.nickname)
-                            .font(.system(size: 14, weight: .semibold))
-                        if node.isSelf {
-                            Text("SELF")
-                                .font(.system(size: 10, weight: .bold))
-                                .tracking(0.8)
-                                .foregroundStyle(AppPalette.dimText)
-                        }
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(node.nickname)
+                        .font(.system(size: 14, weight: .semibold))
+                    if node.isSelf {
+                        Text("SELF")
+                            .font(.system(size: 10, weight: .bold))
+                            .tracking(0.8)
+                            .foregroundStyle(AppPalette.dimText)
                     }
+                    
+                    if let batt = node.battery {
+                        HStack(spacing: 3) {
+                            Image(systemName: batt > 20 ? "battery.75" : "battery.25")
+                            Text("\(batt)%")
+                        }
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(batt > 20 ? .green : .red)
+                    }
+                }
 
+                HStack(spacing: 8) {
                     Text(node.id)
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundStyle(AppPalette.dimText)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
+                    
+                    if let uptime = node.uptime {
+                        Text("up: \(uptime)s")
+                            .font(.system(size: 10))
+                            .foregroundStyle(AppPalette.dimText)
+                    }
                 }
-
-                Spacer()
-
-                Text(node.isOnline ? "OK" : "ERR")
-                    .font(.system(size: 11, weight: .bold))
-                    .tracking(0.8)
-                    .foregroundStyle(node.isOnline ? AppPalette.ok : AppPalette.error)
-
-                Button("Rename", action: onEdit)
-                    .buttonStyle(.plain)
-                    .font(.system(size: 12))
-                    .foregroundStyle(AppPalette.dimText)
+                .lineLimit(1)
+                .truncationMode(.middle)
             }
+
+            Spacer()
+
+            Text(node.isOnline ? "OK" : "ERR")
+                .font(.system(size: 11, weight: .bold))
+                .tracking(0.8)
+                .foregroundStyle(node.isOnline ? AppPalette.ok : AppPalette.error)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)

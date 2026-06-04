@@ -12,7 +12,7 @@ struct ContentView: View {
     @Namespace private var navNamespace
 
     enum Tab: String, CaseIterable, Identifiable {
-        case messages, network
+        case messages, network, settings
 
         var id: Self { self }
 
@@ -20,6 +20,7 @@ struct ContentView: View {
             switch self {
             case .messages: "Chat"
             case .network: "Network"
+            case .settings: "Settings"
             }
         }
 
@@ -27,6 +28,7 @@ struct ContentView: View {
             switch self {
             case .messages: "message"
             case .network: "point.3.connected.trianglepath.dotted"
+            case .settings: "gear"
             }
         }
     }
@@ -58,6 +60,9 @@ struct ContentView: View {
             ConnectionSheet(isPresented: $showingConnectionSheet)
                 .environmentObject(meshManager)
         }
+        .onAppear {
+            meshManager.checkNotificationPermission()
+        }
     }
 
     @ViewBuilder
@@ -67,6 +72,8 @@ struct ContentView: View {
             MessagesView()
         case .network:
             NetworkView()
+        case .settings:
+            SettingsView()
         }
     }
 }
@@ -202,19 +209,20 @@ struct ConnectionBadge: View {
 
 // MARK: - Shared Styling
 enum AppPalette {
-    static let ok = Color(red: 0.25, green: 0.92, blue: 0.48)
-    static let error = Color(red: 1.0, green: 0.22, blue: 0.28)
-    static let cyan = Color(red: 0.25, green: 0.78, blue: 1.0)
-    static let violet = Color(red: 0.58, green: 0.42, blue: 1.0)
-    static let amber = Color(red: 1.0, green: 0.68, blue: 0.24)
-    static let magenta = Color(red: 1.0, green: 0.34, blue: 0.66)
-    static let sentBubble = Color.white
-    static let receivedBubble = Color.black.opacity(0.74)
-    static let border = Color.white.opacity(0.16)
-    static let dimText = Color.white.opacity(0.62)
-    static let panel = Color.white.opacity(0.065)
+    static let ok = Color(red: 0.20, green: 0.78, blue: 0.35) // Apple Green
+    static let error = Color(red: 1.00, green: 0.23, blue: 0.19) // Apple Red
+    static let cyan = Color(red: 0.00, green: 0.48, blue: 1.00) // Apple Blue
+    static let appleGreen = Color(red: 0.20, green: 0.78, blue: 0.35) // Apple Green
+    static let violet = Color(red: 0.35, green: 0.34, blue: 0.84) // Apple Indigo/Violet
+    static let amber = Color(red: 1.00, green: 0.62, blue: 0.04) // Apple Orange
+    static let magenta = Color(red: 0.86, green: 0.19, blue: 0.51) // Apple Pink
+    static let sentBubble = Color(red: 0.00, green: 0.48, blue: 1.00)
+    static let receivedBubble = Color.white.opacity(0.06)
+    static let border = Color.white.opacity(0.12)
+    static let dimText = Color.white.opacity(0.60)
+    static let panel = Color.white.opacity(0.06)
     static let navSelection = LinearGradient(
-        colors: [Color.white, Color(red: 0.82, green: 0.94, blue: 1.0)],
+        colors: [Color.white, Color(red: 0.88, green: 0.92, blue: 0.96)],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
     )
@@ -223,16 +231,16 @@ enum AppPalette {
 enum NodeColor {
     static func color(for nodeId: String) -> Color {
         let palette: [Color] = [
-            Color(red: 0.31, green: 0.76, blue: 0.97),
-            Color(red: 0.81, green: 0.58, blue: 0.85),
-            Color(red: 1.00, green: 0.72, blue: 0.30),
-            Color(red: 0.94, green: 0.60, blue: 0.60),
-            Color(red: 0.50, green: 0.80, blue: 0.77),
-            Color(red: 1.00, green: 0.95, blue: 0.46),
-            Color(red: 0.96, green: 0.56, blue: 0.69),
-            Color(red: 0.65, green: 0.84, blue: 0.65),
-            Color(red: 1.00, green: 0.54, blue: 0.40),
-            Color(red: 0.56, green: 0.79, blue: 0.98)
+            Color(red: 0.00, green: 0.48, blue: 1.00), // Blue
+            Color(red: 0.35, green: 0.34, blue: 0.84), // Indigo
+            Color(red: 1.00, green: 0.62, blue: 0.04), // Orange
+            Color(red: 1.00, green: 0.23, blue: 0.19), // Red
+            Color(red: 0.20, green: 0.78, blue: 0.35), // Green
+            Color(red: 0.00, green: 0.64, blue: 0.80), // Teal
+            Color(red: 0.86, green: 0.19, blue: 0.51), // Pink
+            Color(red: 0.57, green: 0.23, blue: 0.84), // Purple
+            Color(red: 0.95, green: 0.45, blue: 0.20), // Coral
+            Color(red: 0.10, green: 0.70, blue: 0.90)  // Sky
         ]
         let hash = nodeId.unicodeScalars.reduce(5381) { result, scalar in
             ((result << 5) &+ result) &+ Int(scalar.value)
@@ -243,38 +251,14 @@ enum NodeColor {
 
 struct AppBackground: View {
     var body: some View {
-        ZStack {
-            LinearGradient(
-                colors: [
-                    Color(red: 0.02, green: 0.025, blue: 0.04),
-                    Color(red: 0.02, green: 0.01, blue: 0.035),
-                    Color.black
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-
-            RadialGradient(
-                colors: [AppPalette.cyan.opacity(0.22), .clear],
-                center: .topLeading,
-                startRadius: 40,
-                endRadius: 520
-            )
-
-            RadialGradient(
-                colors: [AppPalette.violet.opacity(0.18), .clear],
-                center: .bottomTrailing,
-                startRadius: 60,
-                endRadius: 620
-            )
-
-            RadialGradient(
-                colors: [AppPalette.amber.opacity(0.08), .clear],
-                center: .center,
-                startRadius: 120,
-                endRadius: 700
-            )
-        }
+        LinearGradient(
+            colors: [
+                Color(red: 0.07, green: 0.08, blue: 0.10),
+                Color(red: 0.12, green: 0.13, blue: 0.16)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
         .ignoresSafeArea()
     }
 }

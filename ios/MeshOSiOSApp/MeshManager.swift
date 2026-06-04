@@ -8,7 +8,7 @@ import Combine
 import CoreBluetooth
 import CryptoKit
 import UserNotifications
-import AppKit
+import UIKit
 
 // MARK: - Data Models
 struct MeshData: Codable {
@@ -318,7 +318,7 @@ class MeshManager: NSObject, ObservableObject {
         errorMessage = nil
         isScanning = true
         discoveredNodes.removeAll()
-        centralManager.scanForPeripherals(withServices: nil, options: nil)
+        centralManager.scanForPeripherals(withServices: [serviceUUID], options: nil)
         print("[MeshManager] Started scanning for MeshOS nodes...")
     }
     
@@ -670,6 +670,7 @@ class MeshManager: NSObject, ObservableObject {
             updateMeshData()
             
             if !isMe {
+                Haptics.impact(.light)
                 showNotification(for: newMessage)
             }
         }
@@ -806,7 +807,7 @@ class MeshManager: NSObject, ObservableObject {
                         self.notificationStatus = .authorized
                     } else {
                         self.notificationStatus = .denied
-                        self.errorMessage = "Notifications are disabled. Please enable them in System Settings."
+                        self.errorMessage = "Notifications are disabled. Please enable them in Settings."
                     }
                 }
             }
@@ -814,8 +815,8 @@ class MeshManager: NSObject, ObservableObject {
     }
 
     func openNotificationSettings() {
-        if let url = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension") {
-            NSWorkspace.shared.open(url)
+        if let url = URL(string: UIApplication.openSettingsURLString) {
+            UIApplication.shared.open(url)
         }
     }
     
@@ -877,14 +878,10 @@ extension MeshManager: CBCentralManagerDelegate {
     
     nonisolated func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String : Any], rssi RSSI: NSNumber) {
         Task { @MainActor in
-            let name = advertisementData[CBAdvertisementDataLocalNameKey] as? String ?? peripheral.name ?? ""
-            let uuids = advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID] ?? []
+            let name = advertisementData[CBAdvertisementDataLocalNameKey] as? String ?? peripheral.name ?? "Unknown Node"
             
-            // Check if it is a MeshOS node
-            guard name.hasPrefix("MeshOS_") || uuids.contains(self.serviceUUID) else {
-                return
-            }
-            
+            // Since we scan with serviceUUID filter, any discovered node is our MeshOS node.
+            // If the name is not yet loaded, show placeholder with truncated UUID.
             let displayName = name.hasPrefix("MeshOS_") ? name : "Mesh Node (\(peripheral.identifier.uuidString.prefix(4)))"
             
             let node = DiscoveredNode(id: peripheral.identifier, peripheral: peripheral, name: displayName, rssi: RSSI.intValue)

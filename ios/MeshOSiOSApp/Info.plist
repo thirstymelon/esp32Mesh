@@ -6,5 +6,7 @@
 	<string>Mesh OS requires Bluetooth access to communicate with the ESP32 mesh nodes.</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
 	<string>Mesh OS requires Bluetooth access to communicate with the ESP32 mesh nodes.</string>
+	<key>UILaunchScreen</key>
+	<dict/>
 </dict>
 </plist>
