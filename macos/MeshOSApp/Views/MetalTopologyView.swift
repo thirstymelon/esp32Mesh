@@ -98,22 +98,41 @@ struct MetalTopologyView: NSViewRepresentable {
         }
         
         private func setupPipelines() {
-            guard let device = device else { return }
-            
+            guard let device = device else {
+                print("[MetalTopologyView] No Metal device available — skipping pipeline setup")
+                return
+            }
+
+            guard let library = device.makeDefaultLibrary() else {
+                print("[MetalTopologyView] Could not load default Metal library — is Shaders.metal compiled into the bundle?")
+                return
+            }
+
+            let colorFormat = MTLPixelFormat.bgra8Unorm
+
+            // Resolve each shader function individually so we can log which one is missing.
+            guard let pointVert = library.makeFunction(name: "vertex_point") else {
+                print("[MetalTopologyView] Missing vertex_point shader")
+                return
+            }
+            guard let pointFrag = library.makeFunction(name: "fragment_point") else {
+                print("[MetalTopologyView] Missing fragment_point shader")
+                return
+            }
+            guard let lineVert = library.makeFunction(name: "vertex_line") else {
+                print("[MetalTopologyView] Missing vertex_line shader")
+                return
+            }
+            guard let lineFrag = library.makeFunction(name: "fragment_line") else {
+                print("[MetalTopologyView] Missing fragment_line shader")
+                return
+            }
+            guard let packetVert = library.makeFunction(name: "vertex_packet") else {
+                print("[MetalTopologyView] Missing vertex_packet shader")
+                return
+            }
+
             do {
-                guard let library = device.makeDefaultLibrary() else {
-                    print("[MetalTopologyView] Error: Could not load default library")
-                    return
-                }
-                
-                let pointVert = library.makeFunction(name: "vertex_point")
-                let pointFrag = library.makeFunction(name: "fragment_point")
-                let lineVert = library.makeFunction(name: "vertex_line")
-                let lineFrag = library.makeFunction(name: "fragment_line")
-                let packetVert = library.makeFunction(name: "vertex_packet")
-                
-                let colorFormat = MTLPixelFormat.bgra8Unorm
-                
                 let pointDesc = MTLRenderPipelineDescriptor()
                 pointDesc.vertexFunction = pointVert
                 pointDesc.fragmentFunction = pointFrag
@@ -122,7 +141,7 @@ struct MetalTopologyView: NSViewRepresentable {
                 pointDesc.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
                 pointDesc.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
                 pointPipelineState = try device.makeRenderPipelineState(descriptor: pointDesc)
-                
+
                 let lineDesc = MTLRenderPipelineDescriptor()
                 lineDesc.vertexFunction = lineVert
                 lineDesc.fragmentFunction = lineFrag
@@ -131,7 +150,7 @@ struct MetalTopologyView: NSViewRepresentable {
                 lineDesc.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
                 lineDesc.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
                 linePipelineState = try device.makeRenderPipelineState(descriptor: lineDesc)
-                
+
                 let packetDesc = MTLRenderPipelineDescriptor()
                 packetDesc.vertexFunction = packetVert
                 packetDesc.fragmentFunction = pointFrag
@@ -140,9 +159,9 @@ struct MetalTopologyView: NSViewRepresentable {
                 packetDesc.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
                 packetDesc.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
                 packetPipelineState = try device.makeRenderPipelineState(descriptor: packetDesc)
-                
+
             } catch {
-                print("[MetalTopologyView] Error setup pipelines: \(error.localizedDescription)")
+                print("[MetalTopologyView] Failed to create render pipeline state: \(error.localizedDescription)")
             }
         }
         

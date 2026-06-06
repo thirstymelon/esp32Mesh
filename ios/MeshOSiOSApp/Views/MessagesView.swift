@@ -56,49 +56,59 @@ struct MessagesView: View {
                     }
                     
                     // Main Chat Area (Unified transcript)
-                    ScrollViewReader { proxy in
-                        ScrollView {
-                            LazyVStack(spacing: 14) {
-                                if filteredMessages.isEmpty {
-                                    VStack(spacing: 8) {
-                                        Image(systemName: "message")
-                                            .font(.title)
-                                            .foregroundStyle(AppPalette.dimText)
-                                        Text("No messages yet")
-                                            .font(.system(size: 13, weight: .medium))
-                                            .foregroundStyle(AppPalette.dimText)
+                    ZStack(alignment: .top) {
+                        ScrollViewReader { proxy in
+                            ScrollView {
+                                LazyVStack(spacing: 12) {
+                                    if filteredMessages.isEmpty {
+                                        VStack(spacing: 8) {
+                                            Image(systemName: "message")
+                                                .font(.title)
+                                                .foregroundStyle(AppPalette.dimText)
+                                            Text("No messages yet")
+                                                .font(.system(size: 13, weight: .medium))
+                                                .foregroundStyle(AppPalette.dimText)
+                                        }
+                                        .padding(.top, 40)
+                                    } else {
+                                        let msgsWithDates = addDateSeparators(to: filteredMessages)
+                                        ForEach(msgsWithDates, id: \.id) { item in
+                                            if let dateStr = item.dateString {
+                                                dateSeparator(dateStr)
+                                            }
+                                            MessageBubble(message: item.message)
+                                                .environmentObject(meshManager)
+                                                .id(item.message.id)
+                                                .transition(.scale(scale: 0.85, anchor: item.message.me ? .bottomTrailing : .bottomLeading).combined(with: .opacity))
+                                        }
                                     }
-                                    .padding(.top, 40)
-                                } else {
-                                    ForEach(filteredMessages) { msg in
-                                        MessageBubble(message: msg)
-                                            .environmentObject(meshManager)
-                                            .id(msg.id)
+                                }
+                                .padding()
+                            }
+                            .scrollDismissesKeyboard(.interactively)
+                            .background(
+                                Color.clear
+                                    .contentShape(Rectangle())
+                                    .onTapGesture {
+                                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                                    }
+                            )
+                            .onChange(of: filteredMessages.count) { _, _ in
+                                if let lastId = filteredMessages.last?.id {
+                                    withAnimation {
+                                        proxy.scrollTo(lastId, anchor: .bottom)
                                     }
                                 }
                             }
-                            .padding()
-                        }
-                        .scrollDismissesKeyboard(.interactively)
-                        .background(
-                            Color.clear
-                                .contentShape(Rectangle())
-                                .onTapGesture {
-                                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-                                }
-                        )
-                        .onChange(of: filteredMessages.count) { _, _ in
-                            if let lastId = filteredMessages.last?.id {
-                                withAnimation {
+                            .onAppear {
+                                if let lastId = filteredMessages.last?.id {
                                     proxy.scrollTo(lastId, anchor: .bottom)
                                 }
                             }
                         }
-                        .onAppear {
-                            if let lastId = filteredMessages.last?.id {
-                                proxy.scrollTo(lastId, anchor: .bottom)
-                            }
-                        }
+                        
+                        // Reaction notification banner
+                        reactionBanner
                     }
                     
                     // Horizontal scrollable nodes selection list
@@ -111,7 +121,7 @@ struct MessagesView: View {
                 EmptyChatPanel()
             }
         }
-        .navigationTitle("MeshOS Chat")
+        .navigationTitle("Chat")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -131,9 +141,7 @@ struct MessagesView: View {
                     // "All" Broadcast Button
                     Button {
                         selectedDestinationIds = []
-                        if filterType == .dms {
-                            filterType = .all
-                        }
+                        filterType = .all
                     } label: {
                         VStack(spacing: 6) {
                             Circle()
@@ -184,9 +192,9 @@ struct MessagesView: View {
                                     .fill(isSelected ? .black : NodeColor.color(for: peerIdStr))
                                     .frame(width: 44, height: 44)
                                     .overlay {
-                                        Text(String(peer.nickname.prefix(1)))
-                                            .font(.system(size: 16, weight: .bold))
-                                            .foregroundStyle(isSelected ? .white : .black)
+                                        Image(systemName: NodeAvatar.symbol(for: peerIdStr))
+                                            .font(.system(size: 18, weight: .semibold))
+                                            .foregroundStyle(isSelected ? NodeColor.color(for: peerIdStr) : .black)
                                     }
                                 
                                 Text(peer.nickname)
@@ -254,11 +262,15 @@ struct MessagesView: View {
         )
     }
     
+    @AppStorage("messageHaptics") private var messageHaptics = true
+    
     private func sendMessage() {
         let text = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
 
-        Haptics.impact(.medium)
+        if messageHaptics {
+            Haptics.impact(.medium)
+        }
         messageText = ""
         Task {
             if selectedDestinationIds.isEmpty {
@@ -266,6 +278,108 @@ struct MessagesView: View {
             } else {
                 for dest in selectedDestinationIds {
                     await meshManager.sendMessage(text, to: dest)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Date Separator Helpers
+
+private struct DateSeparatorItem: Identifiable {
+    let id = UUID()
+    let dateString: String?
+    let message: MeshData.Message
+}
+
+private func addDateSeparators(to messages: [MeshData.Message]) -> [DateSeparatorItem] {
+    var result: [DateSeparatorItem] = []
+    var lastDate: Date?
+    for msg in messages {
+        let date = Date(timeIntervalSince1970: TimeInterval(msg.ts))
+        if lastDate == nil || !Calendar.current.isDate(date, inSameDayAs: lastDate!) {
+            let formatter = DateFormatter()
+            if Calendar.current.isDateInToday(date) {
+                result.append(DateSeparatorItem(dateString: "Today", message: msg))
+            } else if Calendar.current.isDateInYesterday(date) {
+                result.append(DateSeparatorItem(dateString: "Yesterday", message: msg))
+            } else {
+                formatter.dateFormat = "EEEE, MMMM d, yyyy"
+                result.append(DateSeparatorItem(dateString: formatter.string(from: date), message: msg))
+            }
+            lastDate = date
+        } else {
+            result.append(DateSeparatorItem(dateString: nil, message: msg))
+        }
+    }
+    return result
+}
+
+private func dateSeparator(_ text: String) -> some View {
+    HStack(spacing: 8) {
+        VStack { Divider().overlay(.white.opacity(0.1)) }
+        Text(text)
+            .font(.system(size: 10, weight: .semibold, design: .rounded))
+            .foregroundStyle(AppPalette.dimText.opacity(0.6))
+            .padding(.horizontal, 8)
+            .fixedSize()
+        VStack { Divider().overlay(.white.opacity(0.1)) }
+    }
+    .padding(.vertical, 6)
+}
+
+// MARK: - Reaction Notification Banner
+
+extension MessagesView {
+    @ViewBuilder
+    var reactionBanner: some View {
+        if let notification = meshManager.currentReactionNotification {
+            HStack(spacing: 10) {
+                Text(notification.emoji)
+                    .font(.system(size: 24))
+                
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Reacted to \(notification.fromNickname)")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white)
+                    Text(notification.messageText)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.white.opacity(0.7))
+                        .lineLimit(1)
+                }
+                
+                Spacer(minLength: 12)
+                
+                Button {
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        meshManager.currentReactionNotification = nil
+                    }
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.6))
+                        .padding(6)
+                        .background(.white.opacity(0.12), in: Circle())
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .strokeBorder(.white.opacity(0.15), lineWidth: 1)
+                    }
+            )
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .shadow(color: .black.opacity(0.3), radius: 12, y: 4)
+            .transition(.move(edge: .top).combined(with: .opacity))
+            .onTapGesture {
+                withAnimation(.easeOut(duration: 0.2)) {
+                    meshManager.currentReactionNotification = nil
                 }
             }
         }
@@ -294,14 +408,32 @@ struct EmptyChatPanel: View {
 struct MessageBubble: View {
     let message: MeshData.Message
     @EnvironmentObject var meshManager: MeshManager
+    
+    private let reactionOptions = ["👍", "❤️", "😂", "😮", "😢", "🙏"]
 
     var senderNickname: String {
         meshManager.meshData?.nicknames.first(where: { $0.id == message.sender })?.nick ?? String(message.sender.prefix(6))
     }
+    
+    private var messageTime: String {
+        let date = Date(timeIntervalSince1970: TimeInterval(message.ts))
+        let formatter = DateFormatter()
+        formatter.dateFormat = "h:mm a"
+        return formatter.string(from: date)
+    }
 
     var body: some View {
-        HStack {
-            if message.me {
+        HStack(alignment: .bottom, spacing: 8) {
+            if !message.me {
+                Circle()
+                    .fill(nodeColor)
+                    .frame(width: 30, height: 30)
+                    .overlay {
+                        Image(systemName: NodeAvatar.symbol(for: message.sender))
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(.black)
+                    }
+            } else {
                 Spacer(minLength: 40)
             }
 
@@ -343,25 +475,134 @@ struct MessageBubble: View {
                         }
                     }
                 
-                if message.me && message.dm {
-                    HStack(spacing: 4) {
-                        Image(systemName: message.delivered ? "checkmark.circle.fill" : "circle")
-                        Text(message.delivered ? "Delivered" : "Pending")
+                // Timestamp and delivery status row
+                HStack(spacing: 6) {
+                    Text(messageTime)
+                        .font(.system(size: 9, design: .monospaced))
+                        .foregroundStyle(AppPalette.dimText.opacity(0.7))
+                    
+                    if message.me && message.dm {
+                        Image(systemName: message.delivered ? "checkmark.circle.fill" : "clock")
+                            .font(.system(size: 9))
+                            .foregroundStyle(message.delivered ? AppPalette.ok : AppPalette.dimText.opacity(0.7))
                     }
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(message.delivered ? AppPalette.ok : AppPalette.dimText)
-                    .padding(.trailing, 4)
+                }
+                .padding(.horizontal, 4)
+                
+                // Reaction pills
+                if !message.reactions.isEmpty {
+                    HStack(spacing: 4) {
+                        ForEach(message.reactions) { reaction in
+                            Button {
+                                withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
+                                    meshManager.toggleReaction(reaction.emoji, for: message.id)
+                                }
+                            } label: {
+                                HStack(spacing: 3) {
+                                    Text(reaction.emoji)
+                                        .font(.system(size: 12))
+                                    Text("\(reaction.count)")
+                                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                }
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 3)
+                                .background(
+                                    reaction.reactedByMe
+                                    ? nodeColor.opacity(0.25)
+                                    : Color.white.opacity(0.08)
+                                )
+                                .clipShape(Capsule())
+                                .overlay(
+                                    Capsule()
+                                        .strokeBorder(
+                                            reaction.reactedByMe ? nodeColor.opacity(0.5) : .clear,
+                                            lineWidth: 1
+                                        )
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 4)
+                    .padding(.top, 2)
                 }
             }
             .frame(maxWidth: 280, alignment: message.me ? .trailing : .leading)
 
-            if !message.me {
+            if message.me {
+                Circle()
+                    .fill(nodeColor)
+                    .frame(width: 30, height: 30)
+                    .overlay {
+                        Image(systemName: NodeAvatar.symbol(for: message.sender))
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(.black)
+                    }
+            } else {
                 Spacer(minLength: 40)
             }
+        }
+        .padding(.horizontal, 4)
+        .contextMenu {
+            ForEach(reactionOptions, id: \.self) { emoji in
+                Button {
+                    withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
+                        meshManager.toggleReaction(emoji, for: message.id)
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        Text(emoji)
+                            .font(.system(size: 16))
+                        Text(reactionLabel(for: emoji))
+                            .font(.system(size: 13))
+                    }
+                }
+            }
+            
+            if message.reactions.contains(where: { $0.reactedByMe }) {
+                Divider()
+                
+                Button(role: .destructive) {
+                    // Remove all my reactions
+                    for reaction in message.reactions where reaction.reactedByMe {
+                        meshManager.toggleReaction(reaction.emoji, for: message.id)
+                    }
+                } label: {
+                    Label("Clear my reactions", systemImage: "xmark.circle")
+                }
+            }
+        } preview: {
+            VStack(alignment: .center, spacing: 4) {
+                Text(message.text)
+                    .font(.system(size: 13))
+                    .lineLimit(3)
+                    .padding(8)
+            }
+            .frame(width: 160)
+        }
+    }
+    
+    private func reactionLabel(for emoji: String) -> String {
+        switch emoji {
+        case "👍": return "Like"
+        case "❤️": return "Love"
+        case "😂": return "Laugh"
+        case "😮": return "Surprise"
+        case "😢": return "Sad"
+        case "🙏": return "Thanks"
+        default: return "React"
         }
     }
 
     private var nodeColor: Color {
         NodeColor.color(for: message.sender)
     }
+}
+
+#Preview {
+    NavigationStack {
+        MessagesView(showingConnectionSheet: .constant(false))
+            .environmentObject(MeshManager())
+    }
+    .preferredColorScheme(.dark)
 }

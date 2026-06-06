@@ -11,7 +11,6 @@
 		Main_App /* MeshOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = Main_App_File /* MeshOSApp.swift */; };
 		Main_Connection /* ConnectionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = Main_Connection_File /* ConnectionSheet.swift */; };
 		Main_Content /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = Main_Content_File /* ContentView.swift */; };
-		Main_Dashboard /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = Main_Dashboard_File /* DashboardView.swift */; };
 		Main_Manager /* MeshManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = Main_Manager_File /* MeshManager.swift */; };
 		Main_Messages /* MessagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = Main_Messages_File /* MessagesView.swift */; };
 		Main_Network /* NetworkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = Main_Network_File /* NetworkView.swift */; };
@@ -24,7 +23,6 @@
 		Main_App_File /* MeshOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeshOSApp.swift; sourceTree = "<group>"; };
 		Main_Connection_File /* ConnectionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionSheet.swift; sourceTree = "<group>"; };
 		Main_Content_File /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		Main_Dashboard_File /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		Main_Entitlements /* MeshOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MeshOS.entitlements; sourceTree = "<group>"; };
 		Main_Manager_File /* MeshManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeshManager.swift; sourceTree = "<group>"; };
 		Main_Messages_File /* MessagesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagesView.swift; sourceTree = "<group>"; };
@@ -69,7 +67,6 @@
 				Main_Network_File /* NetworkView.swift */,
 				Main_Connection_File /* ConnectionSheet.swift */,
 				Main_Settings_File /* SettingsView.swift */,
-				Main_Dashboard_File /* DashboardView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -133,7 +130,6 @@
 				Main_Network /* NetworkView.swift in Sources */,
 				Main_Connection /* ConnectionSheet.swift in Sources */,
 				Main_Settings /* SettingsView.swift in Sources */,
-				Main_Dashboard /* DashboardView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -4,7 +4,6 @@ struct ConnectionSheet: View {
     @EnvironmentObject var meshManager: MeshManager
     @Binding var isPresented: Bool
     @State private var isConnecting = false
-    @State private var showError = false
 
     var body: some View {
         NavigationStack {
@@ -33,7 +32,53 @@ struct ConnectionSheet: View {
                         }
                         .padding(.horizontal)
                         
-                        if meshManager.discoveredNodes.isEmpty {
+                        if meshManager.bluetoothState != .poweredOn {
+                            VStack(spacing: 16) {
+                                Image(systemName: "wifi.slash")
+                                    .font(.system(size: 40))
+                                    .foregroundStyle(AppPalette.dimText)
+                                
+                                Text("Bluetooth not turned ON")
+                                    .font(.subheadline)
+                                    .foregroundStyle(AppPalette.dimText)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 60)
+                            .background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 16))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 16)
+                                    .strokeBorder(.white.opacity(0.12), lineWidth: 1)
+                            }
+                            .padding(.horizontal)
+                        } else if meshManager.discoveredNodes.isEmpty && meshManager.scanDidTimeout {
+                            VStack(spacing: 16) {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.system(size: 40))
+                                    .foregroundStyle(AppPalette.dimText)
+                                
+                                Text("No MeshOS nodes found nearby.")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.white)
+                                
+                                Button {
+                                    meshManager.startScanning()
+                                } label: {
+                                    Label("Scan Again", systemImage: "arrow.clockwise")
+                                        .font(.system(size: 14, weight: .semibold))
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                                .disabled(isConnecting)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 60)
+                            .background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 16))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 16)
+                                    .strokeBorder(.white.opacity(0.12), lineWidth: 1)
+                            }
+                            .padding(.horizontal)
+                        } else if meshManager.discoveredNodes.isEmpty {
                             VStack(spacing: 16) {
                                 Image(systemName: "dot.radiowaves.left.and.right")
                                     .font(.system(size: 40))
@@ -159,7 +204,6 @@ struct ConnectionSheet: View {
             .onChange(of: meshManager.errorMessage) { _, error in
                 if error != nil && isConnecting {
                     isConnecting = false
-                    showError = true
                 }
             }
         }
@@ -168,7 +212,12 @@ struct ConnectionSheet: View {
 
     private func connect(to node: DiscoveredNode) {
         isConnecting = true
-        showError = false
         meshManager.connect(to: node)
     }
+}
+
+#Preview {
+    ConnectionSheet(isPresented: .constant(true))
+        .environmentObject(MeshManager())
+        .preferredColorScheme(.dark)
 }

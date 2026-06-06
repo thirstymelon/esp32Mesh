@@ -42,8 +42,8 @@ struct NetworkView: View {
                                             .fill(NodeColor.color(for: String(node.id)))
                                             .frame(width: 32, height: 32)
                                             .overlay {
-                                                Text(String(node.nickname.prefix(1)))
-                                                    .font(.system(size: 12, weight: .bold))
+                                                Image(systemName: NodeAvatar.symbol(for: String(node.id)))
+                                                    .font(.system(size: 13, weight: .semibold))
                                                     .foregroundStyle(.black)
                                             }
                                         
@@ -159,7 +159,7 @@ struct NetworkView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .navigationTitle("Network Details")
+        .navigationTitle("Network")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -217,4 +217,12 @@ struct MiniMetricCard: View {
                 .strokeBorder(AppPalette.border, lineWidth: 1)
         }
     }
+}
+
+#Preview {
+    NavigationStack {
+        NetworkView(showingConnectionSheet: .constant(false))
+            .environmentObject(MeshManager())
+    }
+    .preferredColorScheme(.dark)
 }

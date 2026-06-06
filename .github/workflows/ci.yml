@@ -1,0 +1,86 @@
+name: MeshOS Build Check
+
+on: [push, pull_request]
+
+jobs:
+
+  firmware:
+    name: Firmware (ESP32)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: ${{ runner.os }}-pio-${{ hashFiles('firmware/platformio.ini', 'firmware/sdkconfig') }}
+          restore-keys: |
+            ${{ runner.os }}-pio-
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install PlatformIO
+        run: pip install platformio
+
+      - name: Create secrets file
+        run: cp firmware/include/secrets.example.h firmware/include/secrets.h
+
+      - name: Build firmware
+        run: cd firmware && pio run -e esp32dev
+
+  macos:
+    name: macOS App
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Xcode DerivedData
+        uses: actions/cache@v4
+        with:
+          path: macos/Build/DerivedData
+          key: ${{ runner.os }}-xcode-macos-${{ hashFiles('macos/MeshOS.xcodeproj/project.pbxproj') }}
+          restore-keys: |
+            ${{ runner.os }}-xcode-macos-
+
+      - name: Build macOS app
+        run: |
+          cd macos
+          xcodebuild -project MeshOS.xcodeproj \
+                     -scheme MeshOS \
+                     -destination 'platform=macOS' \
+                     -derivedDataPath Build/DerivedData \
+                     -skipPackagePluginValidation \
+                     CODE_SIGNING_ALLOWED=NO \
+                     CODE_SIGNING_REQUIRED=NO \
+                     build
+
+  ios:
+    name: iOS App
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Xcode DerivedData
+        uses: actions/cache@v4
+        with:
+          path: ios/Build/DerivedData
+          key: ${{ runner.os }}-xcode-ios-${{ hashFiles('ios/MeshOSiOS.xcodeproj/project.pbxproj') }}
+          restore-keys: |
+            ${{ runner.os }}-xcode-ios-
+
+      - name: Build iOS app
+        run: |
+          cd ios
+          xcodebuild -project MeshOSiOS.xcodeproj \
+                     -scheme MeshOS \
+                     -destination 'generic/platform=iOS' \
+                     -derivedDataPath Build/DerivedData \
+                     -skipPackagePluginValidation \
+                     CODE_SIGNING_ALLOWED=NO \
+                     CODE_SIGNING_REQUIRED=NO \
+                     build

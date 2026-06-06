@@ -81,11 +81,6 @@ struct ContentView: View {
         }
     }
 
-    private var shortNodeName: String {
-        guard let data = meshManager.meshData else { return "Connected" }
-        let nickname = meshManager.currentNodeNickname
-        return nickname == "Unknown" ? String(data.nodeId.prefix(6)) : nickname
-    }
 }
 
 // MARK: - Shared Styling
@@ -122,6 +117,33 @@ enum NodeColor {
             ((result << 5) &+ result) &+ Int(scalar.value)
         }
         return palette[abs(hash) % palette.count]
+    }
+}
+
+enum NodeAvatar {
+    static let symbols = [
+        "tortoise.fill",
+        "hare.fill",
+        "bird.fill",
+        "ant.fill",
+        "ladybug.fill",
+        "leaf.fill",
+        "pawprint.fill",
+        "flame.fill",
+        "bolt.fill",
+        "star.fill",
+        "crown.fill",
+        "shield.fill",
+        "gamecontroller.fill",
+        "sun.max.fill",
+        "moon.stars.fill"
+    ]
+    
+    static func symbol(for nodeId: String) -> String {
+        let hash = nodeId.unicodeScalars.reduce(5381) { result, scalar in
+            ((result << 5) &+ result) &+ Int(scalar.value)
+        }
+        return symbols[abs(hash) % symbols.count]
     }
 }
 

@@ -9,6 +9,9 @@ struct MeshOSApp: App {
             ContentView()
                 .environmentObject(meshManager)
                 .preferredColorScheme(.dark)
+                .onReceive(NotificationCenter.default.publisher(for: UIApplication.willTerminateNotification)) { _ in
+                    meshManager.cleanupOnClose()
+                }
         }
     }
 }

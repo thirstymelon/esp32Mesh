@@ -6,6 +6,10 @@
 # =========================
 firmware/.pio/
 firmware/.vscode/
+firmware/.cache/
+
+# Firmware generated sdkconfig variants
+sdkconfig.*
 
 # Secrets
 firmware/include/secrets.h

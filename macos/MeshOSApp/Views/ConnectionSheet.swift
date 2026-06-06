@@ -9,15 +9,14 @@ struct ConnectionSheet: View {
     @EnvironmentObject var meshManager: MeshManager
     @Binding var isPresented: Bool
     @State private var isConnecting = false
-    @State private var showError = false
 
     var body: some View {
         VStack(spacing: 18) {
             HStack(spacing: 12) {
-                Image(systemName: "antenna.radiowaves.left.and.right")
+                Image(systemName: "point.3.connected.trianglepath.dotted")
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(AppPalette.cyan)
-                    .frame(width: 36, height: 36)
+                    .foregroundStyle(AppPalette.appleGreen)
+                    .frame(width: 40, height: 40)
                     .meshGlass(cornerRadius: 13)
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -27,18 +26,6 @@ struct ConnectionSheet: View {
                         .font(.caption)
                         .foregroundStyle(AppPalette.dimText)
                 }
-
-                Spacer()
-
-                Button {
-                    isPresented = false
-                } label: {
-                    Image(systemName: "xmark")
-                        .frame(width: 28, height: 28)
-                        .background(.white.opacity(0.08), in: Circle())
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
             }
 
             VStack(alignment: .leading, spacing: 10) {
@@ -53,20 +40,58 @@ struct ConnectionSheet: View {
                     }
                 }
 
-                if meshManager.discoveredNodes.isEmpty {
+                if meshManager.bluetoothState != .poweredOn {
                     VStack(spacing: 12) {
-                        Image(systemName: "dot.radiowaves.left.and.right")
+                        Image(systemName: "water.waves.slash")
                             .font(.system(size: 28))
                             .foregroundStyle(AppPalette.dimText)
-                            .symbolEffect(.variableColor.iterative, options: .repeating)
                         
-                        Text("Searching for MeshOS nodes...")
+                        Text("Turn ON Bluetooth to scan for Nodes")
                             .font(.system(size: 13))
                             .foregroundStyle(AppPalette.dimText)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 40)
                     .meshGlass(cornerRadius: 16)
+                } else if meshManager.discoveredNodes.isEmpty {
+                    if meshManager.scanDidTimeout {
+                        VStack(spacing: 12) {
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: 28))
+                                .foregroundStyle(AppPalette.dimText)
+                            
+                            Text("No MeshOS nodes found nearby.")
+                                .font(.system(size: 13))
+                                .foregroundStyle(.white)
+                            
+                            Button {
+                                meshManager.startScanning()
+                            } label: {
+                                Label("Scan Again", systemImage: "arrow.clockwise")
+                                    .font(.system(size: 12, weight: .semibold))
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                            .disabled(isConnecting)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 40)
+                        .meshGlass(cornerRadius: 16)
+                    } else {
+                        VStack(spacing: 12) {
+                            Image(systemName: "dot.radiowaves.left.and.right")
+                                .font(.system(size: 28))
+                                .foregroundStyle(AppPalette.dimText)
+                                .symbolEffect(.variableColor.iterative, options: .repeating)
+                            
+                            Text("Searching for MeshOS nodes...")
+                                .font(.system(size: 13))
+                                .foregroundStyle(AppPalette.dimText)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 40)
+                        .meshGlass(cornerRadius: 16)
+                    }
                 } else {
                     ScrollView {
                         VStack(spacing: 8) {
@@ -132,18 +157,23 @@ struct ConnectionSheet: View {
         .onChange(of: meshManager.errorMessage) { _, error in
             if error != nil && isConnecting {
                 isConnecting = false
-                showError = true
             }
         }
     }
 
     private func connect(to node: DiscoveredNode) {
         isConnecting = true
-        showError = false
         meshManager.connect(to: node)
         // Connection result is handled by onChange(of: meshManager.isConnected)
         // and onChange(of: meshManager.errorMessage) above — no polling needed.
     }
+}
+
+#Preview {
+    ConnectionSheet(isPresented: .constant(true))
+        .environmentObject(MeshManager())
+        .frame(width: 480, height: 400)
+        .preferredColorScheme(.dark)
 }
 
 struct DiscoveredNodeRow: View {

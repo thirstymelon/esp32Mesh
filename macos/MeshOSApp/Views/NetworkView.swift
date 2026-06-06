@@ -21,7 +21,7 @@ struct NetworkView: View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Network Map")
-                    .font(.system(.title, design: .rounded, weight: .bold))
+                    .font(.system(size: 30, weight: .semibold, design: .rounded))
                     .foregroundStyle(.white)
                 Text("Interactive live mesh topology and routing telemetry")
                     .font(.subheadline)
@@ -63,8 +63,8 @@ struct NetworkView: View {
                                             .fill(NodeColor.color(for: String(node.id)))
                                             .frame(width: 32, height: 32)
                                             .overlay {
-                                                Text(String(node.nickname.prefix(1)))
-                                                    .font(.system(size: 12, weight: .bold))
+                                                Image(systemName: NodeAvatar.symbol(for: String(node.id)))
+                                                    .font(.system(size: 13, weight: .semibold))
                                                     .foregroundStyle(.black)
                                             }
                                         
@@ -201,7 +201,8 @@ struct NetworkView: View {
 struct MetalTopologyMapPanel: View {
     @EnvironmentObject var meshManager: MeshManager
     @StateObject private var simulation = PhysicsSimulation()
-    private let timer = Timer.publish(every: 1.0/60.0, on: .main, in: .common).autoconnect()
+    let timer = Timer.publish(every: 1.0/60.0, on: .main, in: .common).autoconnect()
+    @State private var isVisible = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -226,14 +227,17 @@ struct MetalTopologyMapPanel: View {
                 .frame(height: 380)
                 .meshGlass(cornerRadius: 16)
                 .onAppear {
+                    isVisible = true
                     if let data = meshManager.meshData {
                         simulation.tick(nodes: meshManager.activeNodes, localIdStr: data.nodeId)
                     }
                 }
+                .onDisappear {
+                    isVisible = false
+                }
                 .onReceive(timer) { _ in
-                    if let data = meshManager.meshData {
-                        simulation.tick(nodes: meshManager.activeNodes, localIdStr: data.nodeId)
-                    }
+                    guard isVisible, let data = meshManager.meshData else { return }
+                    simulation.tick(nodes: meshManager.activeNodes, localIdStr: data.nodeId)
                 }
             } else {
                 GeometryReader { geo in
@@ -271,10 +275,11 @@ struct MetalTopologyMapPanel: View {
                 }
                 .frame(height: 380)
                 .meshGlass(cornerRadius: 16)
+                .onAppear { isVisible = true }
+                .onDisappear { isVisible = false }
                 .onReceive(timer) { _ in
-                    if let data = meshManager.meshData {
-                        simulation.tick(nodes: meshManager.activeNodes, localIdStr: data.nodeId)
-                    }
+                    guard isVisible, let data = meshManager.meshData else { return }
+                    simulation.tick(nodes: meshManager.activeNodes, localIdStr: data.nodeId)
                 }
             }
         }
@@ -307,6 +312,28 @@ struct MiniMetricCard: View {
             RoundedRectangle(cornerRadius: 16)
                 .strokeBorder(AppPalette.border, lineWidth: 1)
         }
+    }
+}
+
+// MARK: - Empty State View (used when not connected)
+struct EmptyStateView: View {
+    let icon: String
+    let title: String
+    let message: String
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 28, weight: .medium))
+                .foregroundStyle(AppPalette.dimText)
+            Text(title)
+                .font(.system(size: 14, weight: .medium))
+            Text(message)
+                .font(.system(size: 12))
+                .foregroundStyle(AppPalette.dimText)
+                .multilineTextAlignment(.center)
+        }
+        .padding(24)
     }
 }
 
@@ -609,4 +636,11 @@ class PhysicsSimulation: ObservableObject {
         
         self.nodeLayouts = currentLayouts
     }
+}
+
+#Preview {
+    NetworkView()
+        .environmentObject(MeshManager())
+        .frame(width: 920, height: 640)
+        .preferredColorScheme(.dark)
 }

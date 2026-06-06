@@ -8,6 +8,9 @@ struct MeshOSApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(meshManager)
+                .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
+                    meshManager.cleanupOnClose()
+                }
         }
         .windowToolbarStyle(.unified)
         .commands {
@@ -36,4 +39,8 @@ struct MeshOSApp: App {
                 .environmentObject(meshManager)
         }
     }
+}
+
+#Preview {
+    ContentView()
 }

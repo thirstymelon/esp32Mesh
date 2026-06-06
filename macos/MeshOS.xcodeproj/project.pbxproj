@@ -13,12 +13,10 @@
 		Main_Content /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = Main_Content_File /* ContentView.swift */; };
 		Main_Manager /* MeshManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = Main_Manager_File /* MeshManager.swift */; };
 		Main_Messages /* MessagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = Main_Messages_File /* MessagesView.swift */; };
-		Main_Network /* NetworkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = Main_Network_File /* NetworkView.swift */; };
-		Main_Nodes /* NodesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = Main_Nodes_File /* NodesView.swift */; };
-		Main_Settings /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = Main_Settings_File /* SettingsView.swift */; };
 		Main_MetalTopology /* MetalTopologyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = Main_MetalTopology_File /* MetalTopologyView.swift */; };
+		Main_Network /* NetworkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = Main_Network_File /* NetworkView.swift */; };
+		Main_Settings /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = Main_Settings_File /* SettingsView.swift */; };
 		Main_Shaders /* Shaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = Main_Shaders_File /* Shaders.metal */; };
-		Main_Dashboard /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = Main_Dashboard_File /* DashboardView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -30,12 +28,10 @@
 		Main_Entitlements /* MeshOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MeshOS.entitlements; sourceTree = "<group>"; };
 		Main_Manager_File /* MeshManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeshManager.swift; sourceTree = "<group>"; };
 		Main_Messages_File /* MessagesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagesView.swift; sourceTree = "<group>"; };
-		Main_Network_File /* NetworkView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkView.swift; sourceTree = "<group>"; };
-		Main_Nodes_File /* NodesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NodesView.swift; sourceTree = "<group>"; };
-		Main_Settings_File /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		Main_MetalTopology_File /* MetalTopologyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalTopologyView.swift; sourceTree = "<group>"; };
+		Main_Network_File /* NetworkView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkView.swift; sourceTree = "<group>"; };
+		Main_Settings_File /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		Main_Shaders_File /* Shaders.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = Shaders.metal; sourceTree = "<group>"; };
-		Main_Dashboard_File /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -73,12 +69,10 @@
 			isa = PBXGroup;
 			children = (
 				Main_Messages_File /* MessagesView.swift */,
-				Main_Nodes_File /* NodesView.swift */,
 				Main_Network_File /* NetworkView.swift */,
 				Main_Connection_File /* ConnectionSheet.swift */,
 				Main_Settings_File /* SettingsView.swift */,
 				Main_MetalTopology_File /* MetalTopologyView.swift */,
-				Main_Dashboard_File /* DashboardView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -139,13 +133,11 @@
 				Main_Content /* ContentView.swift in Sources */,
 				Main_Manager /* MeshManager.swift in Sources */,
 				Main_Messages /* MessagesView.swift in Sources */,
-				Main_Nodes /* NodesView.swift in Sources */,
 				Main_Network /* NetworkView.swift in Sources */,
 				Main_Connection /* ConnectionSheet.swift in Sources */,
 				Main_Settings /* SettingsView.swift in Sources */,
 				Main_MetalTopology /* MetalTopologyView.swift in Sources */,
 				Main_Shaders /* Shaders.metal in Sources */,
-				Main_Dashboard /* DashboardView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -317,6 +309,7 @@
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = NO;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_NO_COMMON_BLOCKS = YES;
