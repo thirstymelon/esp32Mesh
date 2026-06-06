@@ -1,44 +1,74 @@
-# macOS
+# macOS generated files
 .DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
 
 # =========================
-# Firmware (PlatformIO)
+# Firmware (ESP-IDF)
 # =========================
+# Ignore the build directory
+firmware/build/
+
+# SDK configuration files
+# The following MUST remain tracked:
+# firmware/sdkconfig
+# firmware/sdkconfig.defaults
+# firmware/sdkconfig.esp32dev
+# firmware/sdkconfig.optimized
+# firmware/sdkconfig.original
+
+# Ignore generated/temporary SDK configuration variants
+firmware/sdkconfig.old
+firmware/sdkconfig.local
+firmware/sdkconfig.ci
+firmware/sdkconfig.temp
+
+# Ignore PlatformIO artifacts if still present
 firmware/.pio/
-firmware/.vscode/
 firmware/.cache/
 
-# Firmware generated sdkconfig variants
-sdkconfig.*
+# Ignore managed components and dependencies
+firmware/managed_components/
+firmware/dependencies.lock
 
 # Secrets
 firmware/include/secrets.h
+!firmware/include/secrets.example.h
 
 # =========================
-# Xcode / Swift
+# Xcode / Swift / macOS
 # =========================
-**/xcuserdata/
-**/*.xcuserstate
+# Built products
+**/Build/
 **/DerivedData/
+**/Index.noindex/
 
-# Archives
+# Personal settings
+**/*.xcuserdata/
+**/*.xcuserstate
+**/*.xcworkspace/xcuserdata/
+
+# Archives and dSYMs
 **/*.xcarchive
-**/*.dSYM
+**/*.dSYM/
 **/*.dSYM.zip
 
-# SwiftPM
+# Swift Package Manager
 **/.build/
 **/.swiftpm/
 
 # =========================
-# Editors
+# Editors / IDEs
 # =========================
-.vscode/
+# VS Code
+.vscode/*
+!.vscode/extensions.json
+# Cursor
 .cursor/
 
-# =========================
-# Logs & Temp
-# =========================
+# Temporary and log files
 *.log
 *.swp
 *.swo

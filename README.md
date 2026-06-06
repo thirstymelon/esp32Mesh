@@ -5,25 +5,34 @@
   <img src="https://img.shields.io/badge/Transport-ESP--NOW_%2B_BLE_GATT-00C853?style=for-the-badge">
   <img src="https://img.shields.io/badge/Encryption-AES--128--GCM-6A1B9A?style=for-the-badge&logo=keycdn&logoColor=white">
   <img src="https://img.shields.io/badge/PlatformIO-Firmware-F5822A?style=for-the-badge&logo=platformio&logoColor=white">
-  <img src="https://img.shields.io/badge/SwiftUI-macOS_App-000000?style=for-the-badge&logo=apple&logoColor=white">
+  <img src="https://img.shields.io/badge/SwiftUI-iOS_%26_macOS-000000?style=for-the-badge&logo=apple&logoColor=white">
 </p>
 
-> A fully offline, end-to-end encrypted mesh communication system built on ESP32 and managed from a native macOS app over Bluetooth Low Energy.
+> A fully offline, end-to-end encrypted mesh communication system built on ESP32, managed via native iOS and macOS apps over secure Bluetooth Low Energy handshakes.
+
+---
+
+## 📱 Releases & Security Note
+
+> [!IMPORTANT]  
+> **Note on App Signing**: The iOS and macOS apps provided in the [Releases](https://github.com/thirstymelon/esp32Mesh/releases) section are **unsigned**. They do not contain Apple Developer certificates.
+> - **macOS**: You may need to right-click the app and select "Open" to bypass Gatekeeper, or allow it in System Settings > Privacy & Security.
+> - **iOS**: These are provided as source code or `.ipa` files for side-loading (requires AltStore, Sideloadly, or Xcode).
 
 ---
 
 ## Overview
 
-MeshOS is a decentralised peer-to-peer communication platform with **no cloud, no Wi-Fi router, and no internet required**. ESP32 nodes form a self-healing multi-hop mesh using ESP-NOW and expose themselves to the macOS client over BLE GATT. All chat messages are encrypted with **AES-128-GCM** (hardware-accelerated on ESP32).
+MeshOS is a decentralised peer-to-peer communication platform with **no cloud, no Wi-Fi router, and no internet required**. ESP32 nodes form a self-healing multi-hop mesh using ESP-NOW and expose themselves to native Apple clients over BLE GATT.
 
 ```
-┌─────────────┐     BLE GATT     ┌──────────────────────────────────────┐
-│  macOS App  │ ←──────────────→ │  ESP32 Node A                        │
-│  (SwiftUI)  │  Read/Write/Notify│  ┌──────────────────────────────┐   │
-└─────────────┘                  │  │  ESP-NOW Mesh (encrypted)    │   │
-                                 │  │  Node A ↔ Node B ↔ Node C   │   │
-                                 │  └──────────────────────────────┘   │
-                                 └──────────────────────────────────────┘
+┌────────────────┐     BLE GATT     ┌──────────────────────────────────────┐
+│ iOS / macOS App│ ←──────────────→ │  ESP32 Node A                        │
+│   (SwiftUI)    │  Secure Handshake│  ┌──────────────────────────────┐   │
+└────────────────┘  (P-256 ECDH)    │  │  ESP-NOW Mesh (encrypted)    │   │
+                                    │  │  Node A ↔ Node B ↔ Node C   │   │
+                                    │  └──────────────────────────────┘   │
+                                    └──────────────────────────────────────┘
 ```
 
 ---
@@ -33,13 +42,14 @@ MeshOS is a decentralised peer-to-peer communication platform with **no cloud, n
 | Feature | Detail |
 |---------|--------|
 | **Self-healing mesh** | Nodes build routing tables (AODV-lite) via heartbeat broadcasts |
-| **AODV-lite Routing** | Intelligent unicast-aware relaying replaces simple flooding for better scalability |
-| **AES-128-GCM + ECDH** | Session keys negotiated via P-256 ECDH over BLE replace static hardcoded keys |
-| **Reliable Delivery** | End-to-end ACKs and delivery indicators (Pending → Delivered) |
-| **Mesh Time Protocol** | Nodes synchronise Unix epoch mesh-wide via high-authority time distribution |
-| **Telemetry Monitor** | Real-time monitoring of node battery, uptime, and signal strength |
-| **Zero heap allocation** | Firmware uses static buffers even for complex routing and crypto |
-| **Offline-first** | Fully decentralised; local message persistence on macOS |
+| **P-256 ECDH Security** | **Dynamic session keys** negotiated via Elliptic Curve Diffie-Hellman on every connection |
+| **AES-128-GCM** | Hardware-accelerated authenticated encryption for all mesh traffic |
+| **Dual-Platform Apps** | Full-featured native SwiftUI apps for both **iOS** and **macOS** |
+| **Mesh Topology View** | Real-time GPU-rendered (Metal) graph of the entire network structure |
+| **Reliable Delivery** | End-to-end ACKs and delivery indicators for every message |
+| **Mesh Time Sync** | Automatic time distribution across the mesh from the connected app |
+| **Node Telemetry** | Monitor battery levels and uptime of every node in the network |
+| **OTA Updates** | Wireless firmware updates directly from the iOS/macOS app over BLE |
 
 ---
 
@@ -47,232 +57,73 @@ MeshOS is a decentralised peer-to-peer communication platform with **no cloud, n
 
 ```
 esp32Mesh/
-├── firmware/                   # ESP32 firmware (ESP-IDF / PlatformIO)
-│   ├── main/
-│   │   ├── main.c              # Mesh logic, BLE GATT server, ESP-NOW relay
-│   │   ├── CMakeLists.txt      # Component build file
-│   │   └── ssd1306.{c,h}       # SSD1306 driver (kept for reference, unused)
-│   ├── sdkconfig.defaults      # ESP-IDF Kconfig overrides
-│   └── platformio.ini          # PlatformIO build config
-│
-├── macos/                      # macOS SwiftUI client (Xcode)
-│   └── MeshOSApp/
-│       ├── MeshManager.swift   # CoreBluetooth + AES-GCM + GATT protocol
-│       ├── MeshOSApp.swift     # App entry point, menu bar commands
-│       ├── ContentView.swift   # Floating glass nav, shared design system
-│       └── Views/
-│           ├── MessagesView.swift       # Chat UI with DM support
-│           ├── NetworkView.swift        # Metal topology map
-│           ├── NodesView.swift          # Peer list & nickname editor
-│           ├── MetalTopologyView.swift  # GPU-rendered mesh graph
-│           ├── ConnectionSheet.swift    # BLE scan & connect flow
-│           └── SettingsView.swift       # App preferences
-│
-├── futurescope.md              # Full bug tracker & feature roadmap
-├── README.md                   # This file
-└── .gitignore
+├── firmware/                   # ESP32 C firmware (ESP-IDF 5.x / PlatformIO)
+├── ios/                        # iOS SwiftUI application (Xcode)
+└── macos/                      # macOS SwiftUI application (Xcode)
 ```
-
----
-
-## Architecture
-
-### Firmware
-
-The ESP32 firmware runs as a single C source (`main/main.c`) on top of ESP-IDF 5.x with FreeRTOS:
-
-- **Wi-Fi** runs in AP mode (channel 1, WPA2) purely to keep the radio active for ESP-NOW
-- **ESP-NOW** carries all mesh traffic as `MeshPacket` structs (magic, type, seq, src, dest, payload)
-- **NimBLE GATT** exposes 5 characteristics to the macOS client:
-
-| UUID suffix | Name | Properties | Description |
-|-------------|------|------------|-------------|
-| `…0001` | Status | Read, Notify | Node ID, uptime, peer count, nickname |
-| `…0002` | Peers | Read, Notify | Serialised peer list with neighbor topology |
-| `…0003` | Chat | Read, Write, Notify | Encrypted message stream + ACKs & Telemetry |
-| `…0004` | CMD | Write | Commands: set nickname (1), sync messages (3), time sync (4), OTA (5) |
-| `…0005` | ECDH | Read, Write | P-256 Public Key exchange for session keys |
-
-- **Security (v2)**: All chat payloads use dynamic session keys negotiated via P-256 ECDH.
-- **Routing**: AODV-lite logic uses heartbeat hop counts to build optimal routing paths.
-- **Reliability**: End-to-end ACKs ensure messages are received; "Pending" status in app transitions to "Delivered" on ACK.
-
-### macOS App
-
-Built with SwiftUI + CoreBluetooth + CryptoKit + Metal:
-
-- `MeshManager` is the central `@MainActor` `ObservableObject` — owns the `CBCentralManager`, parses all GATT notifications, and drives `@Published` state
-- **Encryption**: `CryptoKit.AES.GCM` with the same 16-byte key as the firmware. The `combined` format (`nonce ‖ ciphertext ‖ tag`) maps directly to the firmware wire format
-- **Message deduplication**: SHA256 of `sender + dest + ts + text` — stable across process restarts and handles rapid messages in the same second
-- **Metal topology map**: `MTKView` renders nodes as GPU points and links as anti-aliased lines at 60 fps
-
----
-
-## Encryption Key
-
-The shared AES-128-GCM key is currently hardcoded in both places. **They must match exactly:**
-
-**Firmware** (`firmware/main/main.c`):
-```c
-static const uint8_t AES_KEY[16] = {
-    0x4D, 0x65, 0x73, 0x68, 0x4F, 0x53, 0x4B, 0x65,
-    0x79, 0x31, 0x32, 0x33, 0x21, 0x40, 0x23, 0x24
-}; // "MeshOSKey123!@#$"
-```
-
-**macOS app** (`macos/MeshOSApp/MeshManager.swift`):
-```swift
-private let aesKey = SymmetricKey(data: Data([
-    0x4D, 0x65, 0x73, 0x68, 0x4F, 0x53, 0x4B, 0x65,
-    0x79, 0x31, 0x32, 0x33, 0x21, 0x40, 0x23, 0x24
-]))
-```
-
-> **⚠️ Change this key before deployment.** Future versions will negotiate a per-session key via ECDH over BLE.
 
 ---
 
 ## Getting Started
 
-### Prerequisites
+### 1. Flash the ESP32 Firmware
 
-| Tool | Version | Purpose |
-|------|---------|---------|
-| PlatformIO CLI | Latest | Build & flash firmware |
-| Xcode | 15+ | Build macOS app |
-| macOS | 13 Ventura+ | Run macOS app |
-| ESP32 dev board | Any rev | Hardware |
-
-### 1. Clone
-
-```bash
-git clone https://github.com/thirstymelon/esp32Mesh.git
-cd esp32Mesh
-```
-
-### 2. Flash Firmware
+**Prerequisites**: [PlatformIO CLI](https://platformio.org/install/cli)
 
 ```bash
 cd firmware
-
-# Build
-pio run
-
-# Flash to connected ESP32
+# Build and flash to connected ESP32
 pio run -t upload
-
-# Monitor serial output (115200 baud)
+# Monitor serial logs (115200 baud)
 pio run -t monitor
 ```
 
-> If you change `sdkconfig.defaults`, delete the `.pio/build` directory first to force a full rebuild: `rm -rf .pio/build`
+### 2. Install the Apps
 
-### 3. Build & Run the macOS App
+#### Option A: Build from Source (Recommended)
+- **macOS**: Open `macos/MeshOS.xcodeproj` in Xcode 15+, select the `MeshOS` scheme, and press `⌘R`.
+- **iOS**: Open `ios/MeshOSiOS.xcodeproj` in Xcode, connect your iPhone, and deploy to the device.
 
-```bash
-open macos/MeshOS.xcodeproj
-```
+#### Option B: Download Releases
+Download the latest binaries from the [Releases](https://github.com/thirstymelon/esp32Mesh/releases) page. *See the security note above regarding unsigned apps.*
 
-Then **Product → Run** (`⌘R`).
+### 3. Usage Steps
 
-The app will scan for nearby `MeshOS_XXXXXXXX` BLE peripherals. Tap the **Connect** button in the floating navbar to open the scan sheet.
-
-### 4. Using the App
-
-| Action | How |
-|--------|-----|
-| **Connect to node** | Click `Connect` in the nav bar → select node from scan sheet |
-| **Send a broadcast** | Type in the message box and press Enter or click Send |
-| **Send a DM** | Select a peer in the Nodes tab, click their name, send from the DM view |
-| **Rename a node** | Nodes tab → click the edit (pencil) icon next to the node |
-| **Refresh data** | Click the `↺` button in the nav bar or press `⌘R` |
-| **Disconnect** | Click `Disconnect` in the nav bar or press `⌘D` |
+1.  **Power on** at least two ESP32 nodes running the MeshOS firmware.
+2.  **Open the App** on your iPhone or Mac.
+3.  **Scan & Connect**: Click the "Connect" button in the app. It will scan for nodes (named `MeshOS_XXXXXXXX`).
+4.  **Secure Handshake**: The app will automatically perform a P-256 ECDH handshake to establish a secure session key.
+5.  **Chat**: Once connected, you can send broadcasts (to everyone) or DMs (to specific nodes).
+6.  **Monitor**: Switch to the **Network** tab to see a live visual map of your mesh topology.
 
 ---
 
-## BLE Protocol Reference
+## Technical Specifications
 
-### Chat write (app → firmware)
+### BLE GATT Interface
+- **Service UUID**: `DECAFBAD-CAFE-4BEE-B00B-000000000000`
+- **Characteristics**:
+    - `...0001` (Status): Node ID, Uptime, Nickname.
+    - `...0002` (Peers): Live neighbor topology data.
+    - `...0003` (Chat): Encrypted message stream (Write/Notify).
+    - `...0005` (ECDH): Public key exchange.
+    - `...0006` (OTA): Firmware update control.
 
-```
-[4 bytes dest_id LE] [12 bytes nonce] [N bytes ciphertext] [16 bytes GCM tag]
-```
-- `dest_id = 0` → broadcast to all nodes
-- `dest_id != 0` → DM to specific node ID
-
-### Chat notification (firmware → app)
-
-```
-[4 sender] [4 dest] [4 ts] [1 flags] [12 nonce] [N ciphertext] [16 GCM tag]
-```
-- `flags` bit 0 = is_me, bit 1 = is_dm
-- Minimum notification size = 41 bytes (13-byte header + 28-byte AES overhead)
-- Maximum plaintext = 172 bytes per packet
-
-### ESP-NOW MeshPacket
-
-```c
-struct MeshPacket {
-    uint16_t magic;        // 0xC0DE
-    uint8_t  type;         // 0=heartbeat, 2=chat, 3=nick_sync
-    uint8_t  seq;          // per-node sequence counter (duplicate filter)
-    uint32_t src_id;
-    uint32_t dest_id;      // 0 = broadcast
-    uint16_t payload_len;
-    uint8_t  payload[200]; // chat: [12 nonce][ciphertext][16 tag]
-};
-```
+### Mesh Protocol
+- **Transport**: ESP-NOW (2.4GHz IEEE 802.11 Raw Frames).
+- **Routing**: AODV-lite (Distance Vector).
+- **Max Hops**: Default 7.
+- **Encryption**: AES-128-GCM (mbedTLS hardware-accelerated).
 
 ---
 
-## Hardware
-
-### Required
-
-- Any **ESP32** development board (ESP32-D0WD, WROOM, WROVER, etc.)
-
-### Optional / Previously Supported
-
-- **SSD1306 OLED** (128×64 I2C) — the `ssd1306.c` driver is retained in the repo but the firmware no longer calls it. Re-integrating the display is a single task in `futurescope.md`.
-
-### Tested Boards
-
-- ESP32 DevKitC v4 (WROOM-32)
-- ESP32 DevKit v1
-
----
-
-## Software Stack
-
-| Component | Technology |
-|-----------|-----------|
-| Mesh transport | ESP-NOW (IEEE 802.11 raw frames) |
-| BLE stack | NimBLE (via ESP-IDF) |
-| Encryption | AES-128-GCM (mbedTLS hardware-accelerated) |
-| Build system | PlatformIO + ESP-IDF 5.5 |
-| macOS UI | SwiftUI |
-| macOS BLE | CoreBluetooth |
-| macOS crypto | CryptoKit (`AES.GCM`) |
-| macOS GPU | Metal (`MTKView`) |
-| Persistence | ESP32 NVS (nicknames, uptime offset) |
-
----
-
-## Known Limitations
-
-See [`futurescope.md`](./futurescope.md) for the full audit. Key items:
-
-- Encryption key is hardcoded — ECDH key exchange is planned
-- `my_seq` is `uint8_t` — wraps at 255 (tracked in futurescope)
-- No message persistence on the macOS side between sessions
-- No BLE passkey pairing (open connection to any macOS client that knows the GATT UUIDs)
+## Hardware Requirements
+- **ESP32 Dev Board**: ESP32-WROOM, ESP32-WROVER, or any standard ESP32 variant.
+- **Apple Device**: iPhone (iOS 17+) or Mac (macOS 13+).
 
 ---
 
 ## License
-
 MIT
 
----
-
-<p align="center"><b>MeshOS — Encrypted distributed communication on embedded hardware.</b></p>
+<p align="center"><b>Built for secure, resilient, and independent communication.</b></p>
